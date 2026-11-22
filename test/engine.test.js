@@ -73,6 +73,42 @@ assert.strictEqual(a.y + 2, b.y);
 
 console.log('engine ok, random games finished: ' + games + ', lines cleared by random play: ' + totalLines);
 
+// *-*-*-*-*-*-*-*-*-*-*-* a row built by both players pays the together bonus, a solo row does not *-*-*-*-*-*-*-*-*-*-*-*
+assert.strictEqual(s.together, 0);
+function closeRow(owner) {
+  const g = E.newGame(['a', 'b']);
+  for (let x = 0; x < E.W - 3; x++) { g.board[E.H - 1][x] = owner; }
+  g.players[1].next = { kind: 'bar3', cells: [[0, 0], [1, 0], [2, 0]] };
+  E.step(g, 16);
+  while (g.players[1].piece.x < E.W - 3) { E.input(g, 1, 'R'); }
+  const before = g.score;
+  E.input(g, 1, 'drop');
+  const dropPoints = g.score - before;
+  for (let i = 0; i < 40; i++) { E.step(g, 16); }
+  return { gain: g.score - before - dropPoints, together: g.together };
+}
+const mixedRow = closeRow(1);
+const soloRow = closeRow(2);
+assert.strictEqual(soloRow.gain, 100);
+assert.strictEqual(soloRow.together, 0);
+assert.strictEqual(mixedRow.gain, 250);
+assert.strictEqual(mixedRow.together, 1);
+
+// *-*-*-*-*-*-*-*-*-*-*-* swap trades the two upcoming pieces, once per piece *-*-*-*-*-*-*-*-*-*-*-*
+s = E.newGame(['a', 'b']);
+E.step(s, 16);
+const n0 = s.players[0].next.kind;
+const n1 = s.players[1].next.kind;
+s.players[0].next.kind = 'mine';
+s.players[1].next.kind = 'yours';
+assert(E.input(s, 0, 'swap'));
+assert.strictEqual(s.players[0].next.kind, 'yours');
+assert.strictEqual(s.players[1].next.kind, 'mine');
+assert(!E.input(s, 0, 'swap'), 'second swap on the same piece must be refused');
+assert(E.input(s, 1, 'swap'), 'the partner still has their own swap');
+s.players[0].next.kind = n0;
+s.players[1].next.kind = n1;
+
 // *-*-*-*-*-*-*-*-*-*-*-* two bots must actually clear rows *-*-*-*-*-*-*-*-*-*-*-*
 const Bot = require('../bot.js');
 let botLines = 0;

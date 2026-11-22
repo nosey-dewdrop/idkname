@@ -8,6 +8,8 @@
   const CLEAR_MS = 260;
   const LINES_PER_LEVEL = 8;
   const LINE_SCORE = [0, 100, 300, 500, 800, 1200];
+  // a row built by both players together is worth more than one built alone.
+  const TOGETHER_BONUS = 150;
 
   // *-*-*-*-*-*-*-*-*-*-*-* pieces *-*-*-*-*-*-*-*-*-*-*-*
   const SHAPES = {
@@ -66,11 +68,12 @@
       score: 0, lines: 0, level: 1,
       started: true, over: false,
       clearing: null,
-      lockN: 0, lastLock: null, clearN: 0, lastClear: null
+      lockN: 0, lastLock: null, clearN: 0, lastClear: null,
+      together: 0, swapN: 0
     };
     for (let y = 0; y < H; y++) { s.board.push(new Array(W).fill(0)); }
     for (let i = 0; i < 2; i++) {
-      const p = { name: names[i], piece: null, next: null, lines: 0, locks: 0, wait: false, timer: 0, bag: [] };
+      const p = { name: names[i], piece: null, next: null, lines: 0, locks: 0, wait: false, swapUsed: false, timer: 0, bag: [] };
       p.next = draw(p);
       s.players.push(p);
     }
@@ -122,9 +125,15 @@
       if (s.board[y].every(function (v) { return v !== 0; })) { rows.push(y); }
     }
     if (rows.length > 0) {
-      s.clearing = { rows: rows, t: CLEAR_MS, by: pi };
+      let mixed = 0;
+      for (const y of rows) {
+        if (s.board[y].indexOf(1) !== -1 && s.board[y].indexOf(2) !== -1) { mixed++; }
+      }
+      const gain = (LINE_SCORE[Math.min(rows.length, 5)] + mixed * TOGETHER_BONUS) * s.level;
+      s.clearing = { rows: rows, t: CLEAR_MS, by: pi, gain: gain };
       s.clearN++;
-      s.lastClear = { rows: rows, by: pi, gain: LINE_SCORE[Math.min(rows.length, 5)] * s.level };
+      s.together += mixed;
+      s.lastClear = { rows: rows, by: pi, gain: gain, mixed: mixed };
     }
   }
 
@@ -134,7 +143,7 @@
     const kept = s.board.filter(function (r, y) { return rows.indexOf(y) === -1; });
     while (kept.length < H) { kept.unshift(new Array(W).fill(0)); }
     s.board = kept;
-    s.score += LINE_SCORE[Math.min(n, 5)] * s.level;
+    s.score += s.clearing.gain;
     s.lines += n;
     s.players[s.clearing.by].lines += n;
     s.level = 1 + Math.floor(s.lines / LINES_PER_LEVEL);
@@ -161,6 +170,7 @@
     pl.piece = { kind: next.kind, cells: next.cells, x: x, y: 0 };
     pl.next = draw(pl);
     pl.timer = 0;
+    pl.swapUsed = false;
     return true;
   }
 
@@ -231,6 +241,17 @@
       }
       return false;
     }
+    // trade upcoming pieces with the partner, once per piece.
+    if (action === 'swap') {
+      if (pl.swapUsed) { return false; }
+      const o = s.players[1 - pi];
+      const mine = pl.next;
+      pl.next = o.next;
+      o.next = mine;
+      pl.swapUsed = true;
+      s.swapN++;
+      return true;
+    }
     if (action === 'drop') {
       const y0 = p.y;
       while (hit(s, pi, p.cells, p.x, p.y + 1) === null) {
@@ -289,8 +310,9 @@
       score: s.score, lines: s.lines, level: s.level,
       started: s.started, over: s.over, clearing: s.clearing,
       lockN: s.lockN, lastLock: s.lastLock, clearN: s.clearN, lastClear: s.lastClear,
+      together: s.together, swapN: s.swapN,
       players: s.players.map(function (p) {
-        return { name: p.name, piece: p.piece, next: p.next, lines: p.lines };
+        return { name: p.name, piece: p.piece, next: p.next, lines: p.lines, locks: p.locks, swapUsed: p.swapUsed };
       })
     };
   }

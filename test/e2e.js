@@ -79,6 +79,39 @@ const shots = process.argv[3];
   await guest.waitForFunction(function (x) { const p = window.__idkname.view().players[0].piece; return p && p.x === x + 1; }, h0, { timeout: 5000 });
   console.log('host input reached the guest board: x ' + h0 + ' -> ' + (h0 + 1));
 
+  // *-*-*-*-*-*-*-*-*-*-*-* swap: the guest trades upcoming pieces, both screens agree *-*-*-*-*-*-*-*-*-*-*-*
+  const before = await host.evaluate(function () { const v = window.__idkname.view(); return [v.players[0].next.kind, v.players[1].next.kind]; });
+  await guest.tap('#pad [data-act="swap"]');
+  await host.waitForFunction(function () { return window.__idkname.view().swapN === 1; }, null, { timeout: 5000 });
+  const after = await host.evaluate(function () { const v = window.__idkname.view(); return [v.players[0].next.kind, v.players[1].next.kind]; });
+  assert.deepStrictEqual(after, [before[1], before[0]]);
+  console.log('swap traded next pieces: ' + before.join(' / ') + ' -> ' + after.join(' / '));
+
+  // *-*-*-*-*-*-*-*-*-*-*-* a third person with the same link watches and cheers *-*-*-*-*-*-*-*-*-*-*-*
+  const watchCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const watcher = await watchCtx.newPage();
+  watcher.on('pageerror', function (e) { errors.push('watcher: ' + e.message); });
+  await watcher.goto(base + '?room=' + code);
+  await watcher.fill('#name', 'seyirci');
+  await watcher.tap('#join');
+  await watcher.waitForSelector('#game:not([hidden])', { timeout: 30000 });
+  assert.strictEqual(await watcher.evaluate(function () { return window.__idkname.role(); }), 'watch');
+  await host.waitForFunction(function () { return document.getElementById('watching').textContent.indexOf('1') !== -1; }, null, { timeout: 5000 });
+  const wx = await host.evaluate(function () { return window.__idkname.view().players[1].piece.x; });
+  await watcher.keyboard.press('ArrowLeft');
+  await watcher.waitForTimeout(400);
+  assert.strictEqual(await host.evaluate(function () { return window.__idkname.view().players[1].piece.x; }), wx, 'a watcher must not move pieces');
+  await watcher.tap('#reacts [data-react="0"]');
+  await host.waitForSelector('.emote', { timeout: 5000 });
+  await guest.waitForSelector('.emote', { timeout: 5000 });
+  await watcher.waitForSelector('.emote', { timeout: 5000 });
+  console.log('watcher joined, cannot move pieces, cheer shows on all three screens');
+  await host.screenshot({ path: shots + '/5b-cheer-desktop.png' });
+  await watcher.screenshot({ path: shots + '/5c-watcher-phone.png' });
+  await watchCtx.close();
+  await host.waitForFunction(function () { return document.getElementById('watching').hidden; }, null, { timeout: 15000 });
+  console.log('watcher left, count cleared');
+
   await host.waitForTimeout(2500);
   await host.screenshot({ path: shots + '/5-game-desktop.png' });
   await guest.screenshot({ path: shots + '/6-game-phone.png' });

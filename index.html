@@ -89,6 +89,7 @@
         <button class="btn ghost" id="copy" data-i18n="copy">copy link</button>
       </div>
       <p class="status" id="lobby-status" role="status"></p>
+      <p class="label" id="lobby-watching" hidden></p>
     </div>
   </section>
 
@@ -111,6 +112,7 @@
         <li><span class="keys2"><kbd data-icon="up"></kbd></span><span data-i18n="kTurn">turn</span></li>
         <li><span class="keys2"><kbd data-icon="down"></kbd></span><span data-i18n="kDown">faster</span></li>
         <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
+        <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
       </ul>
     </div>
 
@@ -135,6 +137,14 @@
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
         <button class="tool speed" id="bot-speed" hidden>speed: normal</button>
       </aside>
+      <p class="label" id="watching" hidden></p>
+    </div>
+
+    <div class="reacts" id="reacts" hidden>
+      <button data-react="0" aria-label="heart" data-icon="heart"></button>
+      <button data-react="1" aria-label="star" data-icon="star"></button>
+      <button data-react="2" aria-label="wow" data-icon="bang"></button>
+      <button data-react="3" aria-label="smile" data-icon="face"></button>
     </div>
 
     <div class="pad" id="pad">
@@ -142,6 +152,7 @@
       <button data-act="R" aria-label="right" data-icon="right"></button>
       <button data-act="rot" aria-label="turn" data-icon="turn"></button>
       <button data-act="D" aria-label="down" data-icon="down"></button>
+      <button data-act="swap" aria-label="swap next" data-icon="swap"></button>
       <button data-act="drop" class="wide" data-i18n="drop">drop</button>
     </div>
   </section>

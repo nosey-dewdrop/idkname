@@ -29,11 +29,12 @@
       netDown: 'could not reach the room service. check your connection and try again.',
       youreIn: 'you are in. the game starts when the host presses start.',
       ready: 'you are both here.',
-      over: 'the stack reached the top', overDetail: '{a} closed {x} rows, {b} closed {y}.',
+      over: 'the stack reached the top', overDetail: '{a} closed {x} rows, {b} closed {y}, {z} of them together.',
       waitHost: 'the host can start another round.',
       partnerLeft: 'your partner dropped out', partnerLeftDetail: 'paused. they can come back with the code {code}.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       best: 'best scores on this device',
+      together: 'together', kSwap: 'swap next', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
     },
@@ -53,11 +54,12 @@
       netDown: 'oda servisine ulaşılamadı. bağlantını kontrol edip tekrar dene.',
       youreIn: 'içeridesin. oda sahibi başlatınca oyun başlar.',
       ready: 'ikiniz de buradasınız.',
-      over: 'yığın tepeye ulaştı', overDetail: '{a} {x} sıra kapattı, {b} {y} sıra kapattı.',
+      over: 'yığın tepeye ulaştı', overDetail: '{a} {x} sıra kapattı, {b} {y} sıra kapattı, {z} tanesi birlikte.',
       waitHost: 'oda sahibi yeni tur başlatabilir.',
       partnerLeft: 'arkadaşın oyundan düştü', partnerLeftDetail: 'duraklatıldı. {code} koduyla geri gelebilir.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       best: 'bu cihazdaki en iyi skorlar',
+      together: 'birlikte', kSwap: 'sıradakini takas et', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
     }
@@ -97,6 +99,11 @@
     down: ['..###..', '..###..', '..###..', '#######', '.#####.', '..###..', '...#...'],
     up: ['...#...', '..###..', '.#####.', '#######', '..###..', '..###..', '..###..'],
     turn: ['.#####..', '#.....#.', '#.......', '#....#..', '#....##.', '.#######', '.....##.', '.....#..'],
+    swap: ['..#....', '.######', '..#....', '.......', '....#..', '######.', '....#..'],
+    heart: ['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
+    star: ['...#...', '..###..', '#######', '.#####.', '.#####.', '.##.##.', '##...##'],
+    bang: ['..###..', '..###..', '..###..', '..###..', '..###..', '.......', '..###..'],
+    face: ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.###.#', '#.....#', '.#####.'],
     soundOn: ['...#....', '..##..#.', '####.#.#', '####...#', '####.#.#', '..##..#.', '...#....'],
     soundOff: ['...#....', '..##....', '####....', '####....', '####....', '..##....', '...#....']
   };
@@ -151,6 +158,11 @@
       const notes = [392, 330, 262, 196];
       for (let i = 0; i < 4; i++) { tone(notes[i], 0.22, 'triangle', 0.12, null, i * 0.18); }
     },
+    swap: function () {
+      tone(440, 0.06, 'square', 0.045, 880);
+      tone(880, 0.06, 'square', 0.045, 440, 0.07);
+    },
+    cheer: function () { tone(1047, 0.07, 'square', 0.03, 1319); },
     join: function () {
       tone(659, 0.08, 'square', 0.05);
       tone(988, 0.14, 'square', 0.05, null, 0.09);
@@ -183,6 +195,10 @@
   let code = '';
   let peer = null;
   let conn = null;        // host: the guest link. guest: the host link.
+  let watchers = [];      // host: people who joined a full room and only watch
+  let watchCount = 0;
+  const REACTS = ['heart', 'star', 'bang', 'face'];
+  const REACT_COLOR = ['--p1', '--accent', '--ink', '--p2'];
   let names = ['', ''];
   let state = null;       // host: live engine state
   let view = null;        // what gets drawn (host: state, guest: last snapshot)
@@ -207,7 +223,10 @@
   function show(id) {
     for (const s of ['home', 'lobby', 'game']) { $(s).hidden = s !== id; }
     $('logo-link').classList.toggle('off', id === 'home');
-    if (id === 'game') { fitBoard(); }
+    if (id === 'game') {
+      applyRole();
+      fitBoard();
+    }
     if (id === 'home') { startDemo(); } else { stopDemo(); }
   }
 
@@ -249,35 +268,67 @@
   }
 
   function hostAccept(c) {
-    c.on('open', function () {
-      if (conn && conn.open && conn !== c) {
-        c.send({ t: 'full' });
-        setTimeout(function () { c.close(); }, 300);
-        return;
-      }
-      conn = c;
-      lastHeard = performance.now();
-    });
+    c.on('open', function () { c._last = performance.now(); });
     c.on('data', function (m) {
-      if (c !== conn) { return; }
-      lastHeard = performance.now();
+      c._last = performance.now();
+      if (c === conn) { lastHeard = c._last; }
       if (m.t === 'hello') {
-        names[1] = String(m.name || 'p2').slice(0, 12);
-        botOn = false;
-        SFX.join();
-        if (state) {
-          state.players[1].name = names[1];
-          paused = false;
-          dirty = true;
-          refreshOverlay();
+        const seatFree = !conn || !conn.open || conn === c;
+        if (seatFree) {
+          conn = c;
+          lastHeard = c._last;
+          names[1] = String(m.name || 'p2').slice(0, 12);
+          botOn = false;
+          SFX.join();
+          if (state) {
+            state.players[1].name = names[1];
+            paused = false;
+            dirty = true;
+            refreshOverlay();
+          }
+        } else if (watchers.length < 12) {
+          if (watchers.indexOf(c) === -1) { watchers.push(c); }
+        } else {
+          c.send({ t: 'full' });
+          setTimeout(function () { c.close(); }, 300);
+          return;
         }
         sendLobby();
+        sendState(true);
         renderLobby();
-      } else if (m.t === 'in' && state && !paused && !botOn) {
+        return;
+      }
+      if (m.t === 'react') {
+        relayReact(m.e);
+        return;
+      }
+      if (c !== conn) { return; }
+      if (m.t === 'in' && state && !paused && !botOn) {
         if (E.input(state, 1, m.a)) { dirty = true; }
       }
     });
-    c.on('close', function () { hostDrop(c); });
+    c.on('close', function () {
+      const w = watchers.indexOf(c);
+      if (w !== -1) {
+        watchers.splice(w, 1);
+        sendLobby();
+        renderLobby();
+        return;
+      }
+      hostDrop(c);
+    });
+  }
+
+  function links() {
+    const all = watchers.filter(function (w) { return w.open; });
+    if (conn && conn.open) { all.unshift(conn); }
+    return all;
+  }
+
+  function relayReact(e) {
+    e = Math.max(0, Math.min(REACTS.length - 1, e | 0));
+    showReact(e);
+    for (const c of links()) { c.send({ t: 'react', e: e }); }
   }
 
   function hostDrop(c) {
@@ -291,16 +342,22 @@
   }
 
   function sendLobby() {
-    if (conn && conn.open) { conn.send({ t: 'lobby', names: names, playing: !!state }); }
+    watchCount = watchers.length;
+    if (conn && conn.open) { conn.send({ t: 'lobby', names: names, playing: !!state, as: 'play', w: watchCount }); }
+    for (const w of watchers) {
+      if (w.open) { w.send({ t: 'lobby', names: names, playing: !!state, as: 'watch', w: watchCount }); }
+    }
   }
 
   function sendState(force) {
     const now = performance.now();
-    if (!conn || !conn.open || !state) { return; }
+    const all = links();
+    if (all.length === 0 || !state) { return; }
     if (!force && now - lastSend < 33) { return; }
     lastSend = now;
     dirty = false;
-    conn.send({ t: 'state', s: E.snapshot(state) });
+    const msg = { t: 'state', s: E.snapshot(state) };
+    for (const c of all) { c.send(msg); }
   }
 
   function hostStart(withBot) {
@@ -388,8 +445,14 @@
       if (m.t === 'full') {
         $('home-status').textContent = t('full');
         show('home');
+      } else if (m.t === 'react') {
+        showReact(m.e);
       } else if (m.t === 'lobby') {
         names = m.names;
+        watchCount = m.w || 0;
+        role = m.as === 'watch' ? 'watch' : 'guest';
+        me = role === 'watch' ? -1 : 1;
+        applyRole();
         if (!m.playing) {
           view = null;
           enterLobby();
@@ -417,9 +480,21 @@
   // *-*-*-*-*-*-*-*-*-*-*-* heartbeat *-*-*-*-*-*-*-*-*-*-*-*
   // a closed tab or a dead phone connection does not always announce itself, so both sides listen for silence.
   setInterval(function () {
+    const now = performance.now();
+    if (role === 'host') {
+      for (const w of watchers.slice()) {
+        if (w.open) { w.send({ t: 'ping' }); }
+        if (now - w._last > SILENCE_MS) {
+          watchers.splice(watchers.indexOf(w), 1);
+          try { w.close(); } catch (e) { /* already gone */ }
+          sendLobby();
+          renderLobby();
+        }
+      }
+    }
     if (!conn || !conn.open) { return; }
     conn.send({ t: 'ping' });
-    if (performance.now() - lastHeard > SILENCE_MS) {
+    if (now - lastHeard > SILENCE_MS) {
       if (role === 'host') { hostDrop(conn); } else { guestDrop(conn); }
     }
   }, 1000);
@@ -464,8 +539,36 @@
       $('start-bot').hidden = !!here;
       if (here) { $('lobby-status').textContent = t('ready'); }
     } else {
-      $('lobby-status').textContent = t('youreIn');
+      $('lobby-status').textContent = t(role === 'watch' ? 'youWatch' : 'youreIn');
     }
+    showWatching();
+  }
+
+  function showWatching() {
+    for (const id of ['watching', 'lobby-watching']) {
+      $(id).hidden = watchCount === 0;
+      $(id).textContent = t('watching', { n: watchCount });
+    }
+  }
+
+  // watchers get cheer buttons instead of game keys.
+  function applyRole() {
+    const w = me < 0;
+    $('pad').hidden = w;
+    $('legend').hidden = w;
+    $('reacts').hidden = !w;
+    if (!$('game').hidden) { fitBoard(); }
+  }
+
+  function showReact(e) {
+    SFX.cheer();
+    const el = document.createElement('div');
+    el.className = 'emote';
+    el.style.color = 'var(' + REACT_COLOR[e] + ')';
+    el.style.left = (8 + Math.random() * 78) + '%';
+    el.innerHTML = pix(REACTS[e]);
+    $('board-frame').appendChild(el);
+    setTimeout(function () { el.remove(); }, 1700);
   }
 
   function drawQr(text) {
@@ -542,7 +645,7 @@
       $('ov-score').hidden = false;
       const d = t('overDetail', {
         a: view.players[0].name, x: view.players[0].lines,
-        b: view.players[1].name, y: view.players[1].lines
+        b: view.players[1].name, y: view.players[1].lines, z: view.together || 0
       });
       $('ov-detail').textContent = role === 'host' ? d : d + ' ' + t('waitHost');
       $('again').hidden = role !== 'host' || !names[1];
@@ -553,7 +656,7 @@
       $('ov-detail').textContent = t('partnerLeftDetail', { code: code });
       $('again').hidden = true;
       $('bot-take').hidden = false;
-    } else if (role === 'guest' && linkLost) {
+    } else if (role !== 'host' && linkLost) {
       ov.hidden = false;
       $('ov-title').textContent = t('hostLeft');
       $('ov-score').hidden = true;
@@ -613,12 +716,13 @@
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* drawing: effects *-*-*-*-*-*-*-*-*-*-*-*
-  const fx = { parts: [], floats: [], flash: null, trail: null, seenLock: 0, seenClear: 0, seenLevel: 1, seenOver: false };
+  const fx = { parts: [], floats: [], flash: null, trail: null, seenLock: 0, seenClear: 0, seenSwap: 0, seenLevel: 1, seenOver: false };
 
   function watchEvents(s, c) {
     if (s.lockN < fx.seenLock || s.clearN < fx.seenClear) {
       fx.seenLock = 0;
       fx.seenClear = 0;
+      fx.seenSwap = 0;
       fx.seenLevel = 1;
       fx.seenOver = false;
       fx.parts = [];
@@ -656,9 +760,18 @@
           }
         }
       }
-      fx.floats.push({ text: '+' + lc.gain, x: E.W * c / 2, y: (lc.rows[0] + 0.5) * c, age: 0 });
+      fx.floats.push({ text: '+' + lc.gain + (lc.mixed ? ' ' + t('together') : ''), x: E.W * c / 2, y: (lc.rows[0] + 0.5) * c, age: 0, life: lc.mixed ? 1.5 : 0.9 });
     }
     fx.seenClear = s.clearN;
+    if ((s.swapN || 0) > fx.seenSwap) {
+      SFX.swap();
+      document.querySelectorAll('.card .next').forEach(function (n) {
+        n.classList.remove('swapped');
+        void n.offsetWidth;
+        n.classList.add('swapped');
+      });
+    }
+    fx.seenSwap = s.swapN || 0;
     if (s.level > fx.seenLevel) { SFX.level(); }
     fx.seenLevel = s.level;
     if (s.over && !fx.seenOver) {
@@ -774,18 +887,18 @@
       }
     }
     fx.parts = fx.parts.filter(function (p) { return p.age < p.life; });
-    ctx.font = Math.round(c * 1.5) + 'px "Jersey 15", monospace';
+    ctx.font = Math.round(c * 1.25) + 'px "Jersey 15", monospace';
     ctx.textAlign = 'center';
     for (const f of fx.floats) {
       f.age += dt;
-      ctx.globalAlpha = Math.max(0, 1 - f.age / 0.9);
+      ctx.globalAlpha = Math.max(0, Math.min(1, 2 * (1 - f.age / f.life)));
       ctx.fillStyle = C.face;
       ctx.fillText(f.text, f.x + 2, f.y - f.age * c * 2 + 2);
       ctx.fillStyle = C.ink;
       ctx.fillText(f.text, f.x, f.y - f.age * c * 2);
     }
     ctx.globalAlpha = 1;
-    fx.floats = fx.floats.filter(function (f) { return f.age < 0.9; });
+    fx.floats = fx.floats.filter(function (f) { return f.age < f.life; });
   }
 
   function fitBoard() {
@@ -827,7 +940,7 @@
     drawSky(now);
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
-    drawBoard($('board').getContext('2d'), view, cell, me, true, dt);
+    drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
     $('bot-speed').hidden = !(role === 'host' && botOn);
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
@@ -1022,7 +1135,7 @@
 
   // *-*-*-*-*-*-*-*-*-*-*-* input *-*-*-*-*-*-*-*-*-*-*-*
   function act(a) {
-    if (!view || view.over || $('game').hidden) { return; }
+    if (!view || view.over || $('game').hidden || me < 0) { return; }
     if (a === 'L' || a === 'R') { SFX.move(); }
     if (a === 'rot') { SFX.turn(); }
     if (role === 'host') {
@@ -1037,7 +1150,7 @@
     ArrowRight: 'R', d: 'R', D: 'R',
     ArrowDown: 'D', s: 'D', S: 'D',
     ArrowUp: 'rot', w: 'rot', W: 'rot', x: 'rot', X: 'rot',
-    ' ': 'drop'
+    ' ': 'drop', c: 'swap', C: 'swap'
   };
   window.addEventListener('keydown', function (ev) {
     wake();
@@ -1045,7 +1158,7 @@
     const a = KEYS[ev.key];
     if (!a) { return; }
     ev.preventDefault();
-    if (ev.repeat && (a === 'drop' || a === 'rot')) { return; }
+    if (ev.repeat && (a === 'drop' || a === 'rot' || a === 'swap')) { return; }
     act(a);
   });
   window.addEventListener('pointerdown', wake);
@@ -1098,6 +1211,16 @@
     state.players[1].name = BOT_NAME;
     paused = false;
     refreshOverlay();
+  });
+  let lastReact = 0;
+  document.querySelectorAll('#reacts button').forEach(function (b) {
+    b.style.color = 'var(' + REACT_COLOR[+b.dataset.react] + ')';
+    b.addEventListener('click', function () {
+      const now = performance.now();
+      if (now - lastReact < 350 || !conn || !conn.open) { return; }
+      lastReact = now;
+      conn.send({ t: 'react', e: +b.dataset.react });
+    });
   });
   $('bot-speed').addEventListener('click', function () {
     botSpeed = (botSpeed + 1) % 3;
@@ -1167,5 +1290,5 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; } };
 })();
