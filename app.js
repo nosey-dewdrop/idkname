@@ -1006,7 +1006,11 @@
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
     drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
-    $('bot-set').hidden = !(role === 'host' && botOn);
+    const showSet = role === 'host' && botOn;
+    if ($('bot-set').hidden === showSet) {
+      $('bot-set').hidden = !showSet;
+      fitBoard();
+    }
     if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
