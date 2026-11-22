@@ -27,6 +27,11 @@ const shots = process.argv[3];
   await mid.fill('#name', 'damla');
   await mid.click('#solo');
   await mid.waitForSelector('#game:not([hidden])');
+  // the computer must not play before the human has placed a piece.
+  await mid.waitForTimeout(5000);
+  assert.strictEqual(await mid.evaluate(function () { return window.__idkname.view().players[1].locks; }), 0, 'computer played before its turn');
+  await mid.waitForFunction(function () { return window.__idkname.view().players[0].piece; });
+  await mid.keyboard.press('Space');
   await mid.waitForFunction(function () {
     const v = window.__idkname.view();
     return v && v.players[1].name === 'pix' && v.board.some(function (r) { return r.indexOf(2) !== -1; });

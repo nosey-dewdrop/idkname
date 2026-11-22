@@ -312,7 +312,7 @@
       lockN: s.lockN, lastLock: s.lastLock, clearN: s.clearN, lastClear: s.lastClear,
       together: s.together, swapN: s.swapN,
       players: s.players.map(function (p) {
-        return { name: p.name, piece: p.piece, next: p.next, lines: p.lines, locks: p.locks, swapUsed: p.swapUsed };
+        return { name: p.name, piece: p.piece, next: p.next, lines: p.lines, locks: p.locks, swapUsed: p.swapUsed, wait: p.wait };
       })
     };
   }

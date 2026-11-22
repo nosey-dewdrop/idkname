@@ -379,9 +379,11 @@
       const dt = Math.min(100, now - last);
       last = now;
       if (paused) { return; }
-      // the computer takes turns: it never gets more than one piece ahead of the human, and it lowers
-      // its piece step by step instead of slamming it.
-      state.players[1].wait = botOn && state.players[1].locks > state.players[0].locks;
+      // strict turns: the computer only plays after the human has placed a piece, never before.
+      // until then its piece hangs at the top with its eyes closed. it lowers its piece step by step.
+      const waitNow = botOn && state.players[1].locks >= state.players[0].locks;
+      if (waitNow !== state.players[1].wait) { dirty = true; }
+      state.players[1].wait = waitNow;
       if (botOn && !state.over && !state.players[1].wait) {
         botClock += dt;
         const a = Bot.act(state, 1);
@@ -858,7 +860,7 @@
     for (let i = 0; i < 2; i++) {
       const p = s.players[i].piece;
       if (!p) { continue; }
-      const closed = (now + i * 1700) % 3400 < 130;
+      const closed = s.players[i].wait || (now + i * 1700) % 3400 < 130;
       for (let j = 0; j < p.cells.length; j++) {
         block(ctx, (p.x + p.cells[j][0]) * c, (p.y + p.cells[j][1]) * c, c, i + 1, j === 1 ? (closed ? 2 : 1) : 0);
       }
