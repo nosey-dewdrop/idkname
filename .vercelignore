@@ -2,3 +2,6 @@
 test
 CLAUDE.md
 .gitignore
+.env.local
+.env*.local
+node_modules

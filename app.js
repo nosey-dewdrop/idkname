@@ -33,7 +33,7 @@
       waitHost: 'the host can start another round.',
       partnerLeft: 'your partner dropped out', partnerLeftDetail: 'paused. they can come back with the code {code}.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
-      best: 'best scores on this device',
+      top: 'top scores',
       together: 'together', kSwap: 'swap next', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
@@ -58,7 +58,7 @@
       waitHost: 'oda sahibi yeni tur başlatabilir.',
       partnerLeft: 'arkadaşın oyundan düştü', partnerLeftDetail: 'duraklatıldı. {code} koduyla geri gelebilir.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
-      best: 'bu cihazdaki en iyi skorlar',
+      top: 'en iyi skorlar',
       together: 'birlikte', kSwap: 'sıradakini takas et', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
@@ -369,6 +369,7 @@
     view = state;
     paused = false;
     botClock = 0;
+    lastRun = null;
     show('game');
     refreshOverlay();
     sendState(true);
@@ -592,9 +593,12 @@
     }
   }
 
-  // *-*-*-*-*-*-*-*-*-*-*-* best scores, kept on this device *-*-*-*-*-*-*-*-*-*-*-*
+  // *-*-*-*-*-*-*-*-*-*-*-* score table: shared by everyone, with your running game climbing through it *-*-*-*-*-*-*-*-*-*-*-*
   let lastRun = null;
-  function loadScores() {
+  let globalTop = null;   // null until the shared table answers; then the list falls back to this device
+  let liveRank = 0;
+
+  function loadLocal() {
     try {
       const a = JSON.parse(store('idkname-scores') || '[]');
       return Array.isArray(a) ? a : [];
@@ -602,33 +606,87 @@
       return [];
     }
   }
+  function fetchScores() {
+    fetch('/api/scores', { cache: 'no-store' }).then(function (r) {
+      return r.ok ? r.json() : Promise.reject();
+    }).then(function (j) {
+      if (Array.isArray(j.top)) {
+        globalTop = j.top;
+        renderScores();
+      }
+    }).catch(function () { /* no shared table here (local run or offline): keep the device list */ });
+  }
   function recordScore(s) {
     if (s.score <= 0) { return; }
-    lastRun = { score: s.score, rows: s.lines, who: s.players[0].name + ' + ' + s.players[1].name, at: Date.now() };
-    const all = loadScores();
+    lastRun = { score: s.score, rows: s.lines, together: s.together || 0, who: s.players[0].name + ' + ' + s.players[1].name, at: Date.now() };
+    const all = loadLocal();
     all.push(lastRun);
     all.sort(function (a, b) { return b.score - a.score; });
     store('idkname-scores', JSON.stringify(all.slice(0, 10)));
+    // one entry per game, sent by the host. automated test browsers never write to the shared table.
+    if (role === 'host' && !navigator.webdriver) {
+      fetch('/api/scores', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lastRun)
+      }).then(fetchScores).catch(function () { /* stays on this device */ });
+    } else {
+      setTimeout(fetchScores, 1500);
+    }
     renderScores();
   }
-  function fillScores(ol, count) {
-    const all = loadScores().slice(0, count);
+
+  // the table to show: the shared list plus, while a game runs, a live row for that game.
+  function tableRows(count, withLive) {
+    const rows = (globalTop || loadLocal()).map(function (r) { return { score: r.score, who: r.who, now: false }; });
+    const sameAsLast = function (r) { return lastRun && r.score === lastRun.score && r.who === lastRun.who; };
+    if (withLive && view && !view.over && view.score > 0) {
+      rows.push({ score: view.score, who: view.players[0].name + ' + ' + view.players[1].name, now: true });
+    } else if (lastRun) {
+      const hit = rows.find(sameAsLast);
+      if (hit) {
+        hit.now = true;
+      } else {
+        rows.push({ score: lastRun.score, who: lastRun.who, now: true });
+      }
+    }
+    rows.sort(function (a, b) { return b.score - a.score || (a.now ? 1 : -1); });
+    for (let i = 0; i < rows.length; i++) { rows[i].rank = i + 1; }
+    const top = rows.slice(0, count);
+    const mine = rows.find(function (r) { return r.now; });
+    if (mine && top.indexOf(mine) === -1 && top.length > 0) { top[top.length - 1] = mine; }
+    return top;
+  }
+  function fillScores(ol, rows) {
+    const sig = rows.map(function (r) { return r.rank + '|' + r.score + '|' + r.who + '|' + r.now; }).join('\n');
+    if (ol._sig === sig) { return; }
+    ol._sig = sig;
     ol.textContent = '';
-    for (let i = 0; i < all.length; i++) {
+    for (const r of rows) {
       const li = document.createElement('li');
-      if (lastRun && all[i].at === lastRun.at) { li.className = 'now'; }
-      for (const v of [i + 1, all[i].score, all[i].who]) {
+      if (r.now) { li.className = 'now'; }
+      for (const v of [r.rank, r.score, r.who]) {
         const sp = document.createElement('span');
         sp.textContent = v;
         li.appendChild(sp);
       }
       ol.appendChild(li);
     }
-    return all.length;
   }
   function renderScores() {
-    $('home-best').hidden = fillScores($('home-scores'), 3) === 0;
-    fillScores($('ov-scores'), 5);
+    const home = tableRows(5, false);
+    $('home-best').hidden = home.length === 0;
+    fillScores($('home-scores'), home);
+    fillScores($('ov-scores'), tableRows(5, false));
+    const side = tableRows(8, true);
+    $('side-top').hidden = side.length === 0;
+    fillScores($('side-scores'), side);
+    // a small hop when the running game passes someone.
+    const mine = side.find(function (r) { return r.now; });
+    const rank = mine && view && !view.over ? mine.rank : 0;
+    if (rank && liveRank && rank < liveRank && !STILL) {
+      const li = $('side-scores').querySelector('.now');
+      if (li) { li.classList.add('bump'); }
+    }
+    liveRank = rank;
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* overlay (game over, partner gone) *-*-*-*-*-*-*-*-*-*-*-*
@@ -944,6 +1002,7 @@
     watchEvents(view, cell);
     drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
     $('bot-speed').hidden = !(role === 'host' && botOn);
+    if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
     $('hud-lines').textContent = view.lines;
@@ -1288,6 +1347,10 @@
   }
   applyWords();
   renderScores();
+  fetchScores();
+  setInterval(function () {
+    if (!document.hidden) { fetchScores(); }
+  }, 20000);
   show('home');
   dropLogoDot();
   requestAnimationFrame(frame);

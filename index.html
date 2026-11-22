@@ -59,7 +59,7 @@
       <p class="status" id="home-status" role="status"></p>
 
       <div id="home-best" hidden>
-        <p class="label" data-i18n="best">best scores on this device</p>
+        <p class="label" data-i18n="top">top scores</p>
         <ol class="scores" id="home-scores"></ol>
       </div>
     </div>
@@ -107,13 +107,10 @@
         <canvas class="next" width="10" height="10"></canvas>
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
       </aside>
-      <ul class="legend" id="legend">
-        <li><span class="keys2"><kbd data-icon="left"></kbd><kbd data-icon="right"></kbd></span><span data-i18n="kMove">move</span></li>
-        <li><span class="keys2"><kbd data-icon="up"></kbd></span><span data-i18n="kTurn">turn</span></li>
-        <li><span class="keys2"><kbd data-icon="down"></kbd></span><span data-i18n="kDown">faster</span></li>
-        <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
-        <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
-      </ul>
+      <div class="top" id="side-top" hidden>
+        <p class="label" data-i18n="top">top scores</p>
+        <ol class="scores" id="side-scores"></ol>
+      </div>
     </div>
 
     <div class="boardwrap" id="boardwrap">
@@ -138,6 +135,13 @@
         <button class="tool speed" id="bot-speed" hidden>speed: normal</button>
       </aside>
       <p class="label" id="watching" hidden></p>
+      <ul class="legend" id="legend">
+        <li><span class="keys2"><kbd data-icon="left"></kbd><kbd data-icon="right"></kbd></span><span data-i18n="kMove">move</span></li>
+        <li><span class="keys2"><kbd data-icon="up"></kbd></span><span data-i18n="kTurn">turn</span></li>
+        <li><span class="keys2"><kbd data-icon="down"></kbd></span><span data-i18n="kDown">faster</span></li>
+        <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
+        <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
+      </ul>
     </div>
 
     <div class="reacts" id="reacts" hidden>

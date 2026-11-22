@@ -1,3 +1,5 @@
 .rabadon/
 .vercel/
 .vercel
+.env*
+node_modules/
