@@ -1,4 +1,4 @@
-// *-*-*-*-*-*-*-*-*-*-*-* duodrop engine *-*-*-*-*-*-*-*-*-*-*-*
+// *-*-*-*-*-*-*-*-*-*-*-* idkname engine *-*-*-*-*-*-*-*-*-*-*-*
 // pure game rules, no dom, no network. the host runs it, the guest only reads its state.
 
 (function (root) {

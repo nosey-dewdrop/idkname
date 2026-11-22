@@ -1,10 +1,10 @@
-// *-*-*-*-*-*-*-*-*-*-*-* duodrop app *-*-*-*-*-*-*-*-*-*-*-*
+// *-*-*-*-*-*-*-*-*-*-*-* idkname app *-*-*-*-*-*-*-*-*-*-*-*
 // screens, drawing, input and the room connection. the host runs the engine, the guest sends moves.
 
 (function () {
   const E = window.Engine;
   const $ = function (id) { return document.getElementById(id); };
-  const PEER_PREFIX = 'duodrop-room-';
+  const PEER_PREFIX = 'idkname-room-';
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
   // *-*-*-*-*-*-*-*-*-*-*-* words *-*-*-*-*-*-*-*-*-*-*-*
@@ -61,7 +61,7 @@
     return null;
   }
 
-  let lang = store('duodrop-lang') || 'en';
+  let lang = store('idkname-lang') || 'en';
   function t(key, vars) {
     let s = WORDS[lang][key] || WORDS.en[key] || key;
     if (vars) {
@@ -88,7 +88,7 @@
   }
   function setPalette(name) {
     document.documentElement.dataset.palette = name;
-    store('duodrop-palette', name);
+    store('idkname-palette', name);
     document.querySelectorAll('.swatch').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.setPalette === name));
     });
@@ -139,7 +139,7 @@
     me = 0;
     code = randomCode();
     names[0] = myName();
-    store('duodrop-name', $('name').value.trim());
+    store('idkname-name', $('name').value.trim());
     $('home-status').textContent = t('opening');
     peer = new Peer(PEER_PREFIX + code);
     peer.on('open', function () {
@@ -237,7 +237,7 @@
     role = 'guest';
     me = 1;
     code = roomCode.toUpperCase();
-    store('duodrop-name', $('name').value.trim());
+    store('idkname-name', $('name').value.trim());
     $('home-status').textContent = t('joining');
     if (peer) { peer.destroy(); }
     peer = new Peer();
@@ -631,7 +631,7 @@
   });
   $('lang').addEventListener('click', function () {
     lang = lang === 'en' ? 'tr' : 'en';
-    store('duodrop-lang', lang);
+    store('idkname-lang', lang);
     applyWords();
     if (!$('lobby').hidden) { renderLobby(); }
   });
@@ -643,8 +643,8 @@
   });
 
   // *-*-*-*-*-*-*-*-*-*-*-* boot *-*-*-*-*-*-*-*-*-*-*-*
-  setPalette(store('duodrop-palette') || 'candy');
-  $('name').value = store('duodrop-name') || '';
+  setPalette(store('idkname-palette') || 'candy');
+  $('name').value = store('idkname-name') || '';
   const roomParam = (new URLSearchParams(location.search).get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   if (roomParam.length === 4) {
     code = roomParam;
@@ -657,5 +657,5 @@
   if (document.fonts && document.fonts.ready) { document.fonts.ready.then(readColors); }
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__duodrop = { view: function () { return view; }, paused: function () { return paused; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; } };
 })();
