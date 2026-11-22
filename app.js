@@ -35,6 +35,7 @@
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores',
       together: 'together', kSwap: 'swap next', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
+      skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
     },
@@ -60,6 +61,7 @@
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar',
       together: 'birlikte', kSwap: 'sıradakini takas et', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
+      skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
     }
@@ -89,6 +91,7 @@
     });
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
     $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
+    $('bot-skill').textContent = t(BOT_SKILL_WORD[botSkill]);
     refreshOverlay();
   }
 
@@ -207,6 +210,8 @@
   let botClock = 0;
   const BOT_PACE = [2.2, 1, 0.45];
   const BOT_SPEED_WORD = ['speedCalm', 'speedNormal', 'speedFast'];
+  const BOT_SKILL_WORD = ['skillEasy', 'skillNormal', 'skillSharp'];
+  let botSkill = Math.min(2, Math.max(0, parseInt(store('idkname-bot-skill') || '1', 10) || 0));
   let botSpeed = Math.min(2, Math.max(0, parseInt(store('idkname-bot-speed') || '1', 10) || 0));
   let dirty = false;
   let lastSend = 0;
@@ -387,7 +392,7 @@
       state.players[1].wait = waitNow;
       if (botOn && !state.over && !state.players[1].wait) {
         botClock += dt;
-        const a = Bot.act(state, 1);
+        const a = Bot.act(state, 1, botSkill);
         const pace = (a === 'drop' ? 75 : Math.max(150, 300 - state.level * 12)) * BOT_PACE[botSpeed];
         if (a && botClock >= pace) {
           botClock = 0;
@@ -1001,7 +1006,7 @@
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
     drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
-    $('bot-speed').hidden = !(role === 'host' && botOn);
+    $('bot-set').hidden = !(role === 'host' && botOn);
     if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
@@ -1282,6 +1287,12 @@
       lastReact = now;
       conn.send({ t: 'react', e: +b.dataset.react });
     });
+  });
+  $('bot-skill').addEventListener('click', function () {
+    botSkill = (botSkill + 1) % 3;
+    store('idkname-bot-skill', String(botSkill));
+    $('bot-skill').textContent = t(BOT_SKILL_WORD[botSkill]);
+    $('bot-skill').blur();
   });
   $('bot-speed').addEventListener('click', function () {
     botSpeed = (botSpeed + 1) % 3;

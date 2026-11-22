@@ -53,7 +53,18 @@
 
   const CFG = { lines: 0.76, height: 0.051, holes: 0.9, bumps: 0.12, side: 0.4 };
 
-  function plan(s, pi) {
+  // skill: 0 easy, 1 normal, 2 sharp. a weaker bot misjudges places, the same way for the whole life of a piece,
+  // so it commits to its mistake instead of dithering.
+  const NOISE = [1.1, 0.35, 0];
+  function wobble(a, b, c) {
+    let h = (a * 73856093) ^ (b * 19349663) ^ (c * 83492791);
+    h = (h ^ (h >>> 13)) * 1274126177;
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967295 * 2 - 1;
+  }
+
+  function plan(s, pi, skill) {
+    const amp = NOISE[skill === undefined ? 2 : skill];
     const p = s.players[pi].piece;
     if (!p) { return null; }
     const other = s.players[1 - pi].piece;
@@ -72,7 +83,8 @@
           // each player mostly keeps to their own half, so partners do not fight over one gap.
           const mid = x + w / 2;
           const away = pi === 0 ? Math.max(0, mid - E.W / 2) : Math.max(0, E.W / 2 - mid);
-          const sc = evaluate(s, cells, x, y, other) - CFG.side * away - (r > 0 ? 0.01 : 0);
+          const sc = evaluate(s, cells, x, y, other) - CFG.side * away - (r > 0 ? 0.01 : 0) +
+            amp * wobble(s.players[pi].locks + 1, x + 1, r + 1);
           if (!best || sc > best.score) { best = { score: sc, sig: k, x: x }; }
         }
       }
@@ -82,10 +94,10 @@
   }
 
   // the next key the bot wants to press, or null.
-  function act(s, pi) {
+  function act(s, pi, skill) {
     const p = s.players[pi].piece;
     if (!p || s.over || s.clearing) { return null; }
-    const b = plan(s, pi);
+    const b = plan(s, pi, skill);
     if (!b) { return 'D'; }
     if (sig(p.cells) !== b.sig) { return 'rot'; }
     if (p.x < b.x) { return 'R'; }
