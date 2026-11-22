@@ -33,6 +33,8 @@
       waitHost: 'the host can start another round.',
       partnerLeft: 'your partner dropped out', partnerLeftDetail: 'paused. they can come back with the code {code}.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
+      best: 'best scores on this device',
+      speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
     },
     tr: {
@@ -55,6 +57,8 @@
       waitHost: 'oda sahibi yeni tur başlatabilir.',
       partnerLeft: 'arkadaşın oyundan düştü', partnerLeftDetail: 'duraklatıldı. {code} koduyla geri gelebilir.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
+      best: 'bu cihazdaki en iyi skorlar',
+      speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
     }
   };
@@ -82,6 +86,7 @@
       el.textContent = t(el.dataset.i18n);
     });
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
+    $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
     refreshOverlay();
   }
 
@@ -184,6 +189,9 @@
   let paused = false;
   let botOn = false;
   let botClock = 0;
+  const BOT_PACE = [2.2, 1, 0.45];
+  const BOT_SPEED_WORD = ['speedCalm', 'speedNormal', 'speedFast'];
+  let botSpeed = Math.min(2, Math.max(0, parseInt(store('idkname-bot-speed') || '1', 10) || 0));
   let dirty = false;
   let lastSend = 0;
   let simTimer = null;
@@ -314,15 +322,17 @@
       const dt = Math.min(100, now - last);
       last = now;
       if (paused) { return; }
-      if (botOn && !state.over) {
+      // the computer takes turns: it never gets more than one piece ahead of the human, and it lowers
+      // its piece step by step instead of slamming it.
+      state.players[1].wait = botOn && state.players[1].locks > state.players[0].locks;
+      if (botOn && !state.over && !state.players[1].wait) {
         botClock += dt;
-        if (botClock >= Math.max(70, 190 - state.level * 10)) {
+        const a = Bot.act(state, 1);
+        const pace = (a === 'drop' ? 75 : Math.max(150, 300 - state.level * 12)) * BOT_PACE[botSpeed];
+        if (a && botClock >= pace) {
           botClock = 0;
-          const a = Bot.act(state, 1);
-          if (a) {
-            if (!E.input(state, 1, a)) { E.input(state, 1, 'D'); }
-            dirty = true;
-          }
+          if (!E.input(state, 1, a === 'drop' ? 'D' : a)) { E.input(state, 1, 'D'); }
+          dirty = true;
         }
       }
       if (E.step(state, dt)) { dirty = true; }
@@ -477,6 +487,45 @@
     }
   }
 
+  // *-*-*-*-*-*-*-*-*-*-*-* best scores, kept on this device *-*-*-*-*-*-*-*-*-*-*-*
+  let lastRun = null;
+  function loadScores() {
+    try {
+      const a = JSON.parse(store('idkname-scores') || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function recordScore(s) {
+    if (s.score <= 0) { return; }
+    lastRun = { score: s.score, rows: s.lines, who: s.players[0].name + ' + ' + s.players[1].name, at: Date.now() };
+    const all = loadScores();
+    all.push(lastRun);
+    all.sort(function (a, b) { return b.score - a.score; });
+    store('idkname-scores', JSON.stringify(all.slice(0, 10)));
+    renderScores();
+  }
+  function fillScores(ol, count) {
+    const all = loadScores().slice(0, count);
+    ol.textContent = '';
+    for (let i = 0; i < all.length; i++) {
+      const li = document.createElement('li');
+      if (lastRun && all[i].at === lastRun.at) { li.className = 'now'; }
+      for (const v of [i + 1, all[i].score, all[i].who]) {
+        const sp = document.createElement('span');
+        sp.textContent = v;
+        li.appendChild(sp);
+      }
+      ol.appendChild(li);
+    }
+    return all.length;
+  }
+  function renderScores() {
+    $('home-best').hidden = fillScores($('home-scores'), 3) === 0;
+    fillScores($('ov-scores'), 5);
+  }
+
   // *-*-*-*-*-*-*-*-*-*-*-* overlay (game over, partner gone) *-*-*-*-*-*-*-*-*-*-*-*
   function refreshOverlay() {
     const ov = $('overlay');
@@ -485,6 +534,7 @@
       return;
     }
     $('bot-take').hidden = true;
+    $('ov-scores').hidden = !view.over;
     if (view.over) {
       ov.hidden = false;
       $('ov-title').textContent = t('over');
@@ -577,7 +627,7 @@
     const now = performance.now();
     if (s.lockN > fx.seenLock && s.lastLock) {
       fx.flash = { cells: s.lastLock.cells, t0: now };
-      if (s.lastLock.fall > 1) {
+      if (s.lastLock.fall > 1 && s.lastLock.pi === me) {
         fx.trail = { cells: s.lastLock.cells, fall: s.lastLock.fall, pi: s.lastLock.pi, t0: now };
         SFX.slam();
         shake();
@@ -611,7 +661,11 @@
     fx.seenClear = s.clearN;
     if (s.level > fx.seenLevel) { SFX.level(); }
     fx.seenLevel = s.level;
-    if (s.over && !fx.seenOver) { SFX.over(); }
+    if (s.over && !fx.seenOver) {
+      SFX.over();
+      recordScore(s);
+      refreshOverlay();
+    }
     fx.seenOver = s.over;
   }
 
@@ -774,6 +828,7 @@
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
     drawBoard($('board').getContext('2d'), view, cell, me, true, dt);
+    $('bot-speed').hidden = !(role === 'host' && botOn);
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
     $('hud-lines').textContent = view.lines;
@@ -848,7 +903,7 @@
       const g = GLYPHS[WORD[n]];
       for (let y = 0; y < 7; y++) {
         for (let x = 0; x < g[y].length; x++) {
-          if (g[y][x] === '#' && !(n === 0 && y === 0)) { grid[y][ox + x] = n < 3 ? 1 : 2; }
+          if (g[y][x] === '#' && !(n === 0 && y === 0)) { grid[y][ox + x] = 1; }
         }
       }
       ox += g[0].length + 1;
@@ -1044,6 +1099,12 @@
     paused = false;
     refreshOverlay();
   });
+  $('bot-speed').addEventListener('click', function () {
+    botSpeed = (botSpeed + 1) % 3;
+    store('idkname-bot-speed', String(botSpeed));
+    $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
+    $('bot-speed').blur();
+  });
   $('copy').addEventListener('click', function () {
     const done = function () {
       $('copy').textContent = t('copied');
@@ -1101,6 +1162,7 @@
     $('join-room').textContent = roomParam;
   }
   applyWords();
+  renderScores();
   show('home');
   dropLogoDot();
   requestAnimationFrame(frame);

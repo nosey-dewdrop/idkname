@@ -112,6 +112,12 @@ svg.pix { display: block; fill: currentColor; shape-rendering: crispEdges; }
 .roomline { font-size: var(--t2); }
 .roomline b { font-weight: 400; letter-spacing: .12em; }
 
+.scores { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; color: var(--mute); font-size: var(--t4); text-align: left; }
+.scores li { display: grid; grid-template-columns: 2ch 6ch minmax(0, 1fr); gap: 10px; }
+.scores li span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scores li.now { color: var(--ink); }
+.home-menu .status:empty { display: none; }
+
 /* *-*-*-*-*-*-*-*-*-*-*-* the cabinet frame around a board *-*-*-*-*-*-*-*-*-*-*-* */
 .frame {
   position: relative; padding: 10px; background: var(--panel);
@@ -181,6 +187,8 @@ kbd {
 }
 kbd svg { width: 12px; height: 12px; }
 kbd.space { width: 66px; }
+.tool.speed { background: var(--panel-d); box-shadow: none; justify-self: start; height: 32px; padding: 0 10px 2px; }
+.tool.speed:hover { color: var(--accent); }
 .pad { display: none; }
 
 .overlay {
@@ -218,6 +226,7 @@ kbd.space { width: 66px; }
   .card { width: 100%; padding: 8px 10px 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; }
   .card .next { grid-row: 1 / span 2; grid-column: 2; }
   .you { display: none; }
+  .tool.speed { grid-column: 1 / -1; margin-top: 4px; }
   .frame { padding: 6px; }
   .overlay { inset: 6px; }
   .pad {

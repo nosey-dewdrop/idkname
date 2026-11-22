@@ -57,6 +57,11 @@
       </div>
 
       <p class="status" id="home-status" role="status"></p>
+
+      <div id="home-best" hidden>
+        <p class="label" data-i18n="best">best scores on this device</p>
+        <ol class="scores" id="home-scores"></ol>
+      </div>
     </div>
     <div class="home-demo" aria-hidden="true">
       <div class="frame"><canvas id="demo"></canvas></div>
@@ -116,6 +121,7 @@
           <p class="label" id="ov-title"></p>
           <p class="code" id="ov-score"></p>
           <p class="hint" id="ov-detail"></p>
+          <ol class="scores" id="ov-scores"></ol>
           <button class="btn" id="again" data-i18n="again">play again</button>
           <button class="btn" id="bot-take" data-i18n="botTake" hidden>keep going with the computer</button>
         </div>
@@ -127,6 +133,7 @@
         <p class="who"><span class="chip"></span><b class="pname"></b><em class="you" data-i18n="you" hidden>you</em></p>
         <canvas class="next" width="10" height="10"></canvas>
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
+        <button class="tool speed" id="bot-speed" hidden>speed: normal</button>
       </aside>
     </div>
 

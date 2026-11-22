@@ -70,7 +70,7 @@
     };
     for (let y = 0; y < H; y++) { s.board.push(new Array(W).fill(0)); }
     for (let i = 0; i < 2; i++) {
-      const p = { name: names[i], piece: null, next: null, lines: 0, timer: 0, bag: [] };
+      const p = { name: names[i], piece: null, next: null, lines: 0, locks: 0, wait: false, timer: 0, bag: [] };
       p.next = draw(p);
       s.players.push(p);
     }
@@ -116,6 +116,7 @@
     dropFrom = null;
     s.players[pi].piece = null;
     s.players[pi].timer = 0;
+    s.players[pi].locks++;
     const rows = [];
     for (let y = 0; y < H; y++) {
       if (s.board[y].every(function (v) { return v !== 0; })) { rows.push(y); }
@@ -262,6 +263,8 @@
         if (spawn(s, i)) { changed = true; }
         continue;
       }
+      // a waiting player's piece hangs where it is until the partner has caught up.
+      if (pl.wait) { continue; }
       pl.timer += dt;
       while (pl.timer >= iv && pl.piece && !s.clearing) {
         pl.timer -= iv;
