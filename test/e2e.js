@@ -17,8 +17,31 @@ const shots = process.argv[3];
   host.on('pageerror', function (e) { errors.push('host: ' + e.message); });
   guest.on('pageerror', function (e) { errors.push('guest: ' + e.message); });
 
+  // *-*-*-*-*-*-*-*-*-*-*-* alone with the computer, in a 1000px wide window *-*-*-*-*-*-*-*-*-*-*-*
+  const midCtx = await browser.newContext({ viewport: { width: 1000, height: 830 } });
+  const mid = await midCtx.newPage();
+  mid.on('pageerror', function (e) { errors.push('mid: ' + e.message); });
+  await mid.goto(base);
+  await mid.waitForTimeout(6000);
+  await mid.screenshot({ path: shots + '/0-home-1000.png' });
+  await mid.fill('#name', 'damla');
+  await mid.click('#solo');
+  await mid.waitForSelector('#game:not([hidden])');
+  await mid.waitForFunction(function () {
+    const v = window.__idkname.view();
+    return v && v.players[1].name === 'pix' && v.board.some(function (r) { return r.indexOf(2) !== -1; });
+  }, null, { timeout: 30000 });
+  console.log('computer partner placed a piece');
+  for (let i = 0; i < 6; i++) {
+    await mid.keyboard.press('ArrowLeft');
+    await mid.keyboard.press('Space');
+    await mid.waitForTimeout(700);
+  }
+  await mid.screenshot({ path: shots + '/0-solo-1000.png' });
+  await midCtx.close();
+
   await host.goto(base);
-  await host.waitForTimeout(1500);
+  await host.waitForTimeout(6000);
   await host.screenshot({ path: shots + '/1-home-desktop.png' });
   await host.fill('#name', 'damla');
   await host.click('#create');

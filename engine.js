@@ -65,7 +65,8 @@
       players: [],
       score: 0, lines: 0, level: 1,
       started: true, over: false,
-      clearing: null
+      clearing: null,
+      lockN: 0, lastLock: null, clearN: 0, lastClear: null
     };
     for (let y = 0; y < H; y++) { s.board.push(new Array(W).fill(0)); }
     for (let i = 0; i < 2; i++) {
@@ -100,11 +101,19 @@
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* lock, clear, spawn *-*-*-*-*-*-*-*-*-*-*-*
+  // set by a hard drop right before it locks, so the screen can draw the fall.
+  let dropFrom = null;
+
   function lock(s, pi) {
     const p = s.players[pi].piece;
+    const placed = [];
     for (const c of p.cells) {
       s.board[p.y + c[1]][p.x + c[0]] = pi + 1;
+      placed.push([p.x + c[0], p.y + c[1]]);
     }
+    s.lockN++;
+    s.lastLock = { pi: pi, cells: placed, fall: dropFrom === null ? 0 : p.y - dropFrom };
+    dropFrom = null;
     s.players[pi].piece = null;
     s.players[pi].timer = 0;
     const rows = [];
@@ -113,6 +122,8 @@
     }
     if (rows.length > 0) {
       s.clearing = { rows: rows, t: CLEAR_MS, by: pi };
+      s.clearN++;
+      s.lastClear = { rows: rows, by: pi, gain: LINE_SCORE[Math.min(rows.length, 5)] * s.level };
     }
   }
 
@@ -220,11 +231,14 @@
       return false;
     }
     if (action === 'drop') {
+      const y0 = p.y;
       while (hit(s, pi, p.cells, p.x, p.y + 1) === null) {
         p.y++;
         s.score += 2;
       }
+      dropFrom = y0;
       tickDown(s, pi);
+      dropFrom = null;
       pl.timer = 0;
       return true;
     }
@@ -271,6 +285,7 @@
       w: s.w, h: s.h, board: s.board,
       score: s.score, lines: s.lines, level: s.level,
       started: s.started, over: s.over, clearing: s.clearing,
+      lockN: s.lockN, lastLock: s.lastLock, clearN: s.clearN, lastClear: s.lastClear,
       players: s.players.map(function (p) {
         return { name: p.name, piece: p.piece, next: p.next, lines: p.lines };
       })
@@ -280,7 +295,7 @@
   const Engine = {
     W: W, H: H, SHAPES: SHAPES,
     newGame: newGame, input: input, step: step, hit: hit,
-    landing: landing, snapshot: snapshot, size: size, interval: interval
+    landing: landing, snapshot: snapshot, size: size, interval: interval, rotated: rotated
   };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Engine;

@@ -72,3 +72,26 @@ assert(s.players[0].piece === a, 'top piece must stay alive on top of partner');
 assert.strictEqual(a.y + 2, b.y);
 
 console.log('engine ok, random games finished: ' + games + ', lines cleared by random play: ' + totalLines);
+
+// *-*-*-*-*-*-*-*-*-*-*-* two bots must actually clear rows *-*-*-*-*-*-*-*-*-*-*-*
+const Bot = require('../bot.js');
+let botLines = 0;
+let botGames = 0;
+s = E.newGame(['a', 'b']);
+for (let i = 0; i < 60000 && botGames < 5; i++) {
+  if (i % 6 === 0) {
+    const who = (i / 6) % 2;
+    const act = Bot.act(s, who);
+    if (act && !E.input(s, who, act)) { E.input(s, who, 'D'); }
+  }
+  E.step(s, 16);
+  if (!s.over) { overlapCheck(s); }
+  if (s.over) {
+    botGames++;
+    botLines += s.lines;
+    s = E.newGame(['a', 'b']);
+  }
+}
+botLines += s.lines;
+assert(botLines >= 20, 'bots cleared only ' + botLines + ' rows');
+console.log('bots ok, rows cleared: ' + botLines + ' in ' + (botGames + 1) + ' games');
