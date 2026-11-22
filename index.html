@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" data-palette="candy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>duodrop</title>
+<meta name="description" content="A falling block game for two. One board, two pieces falling at once. Open a room, your friend scans the QR, you stack together.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <a class="logo" href="./" aria-label="duodrop home">
+    <span class="logo-blocks" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <span>duodrop</span>
+  </a>
+  <div class="bar-tools">
+    <div class="swatches" role="group" aria-label="palette">
+      <button class="swatch" data-set-palette="candy" aria-label="candy palette"></button>
+      <button class="swatch" data-set-palette="meadow" aria-label="meadow palette"></button>
+      <button class="swatch" data-set-palette="arcade" aria-label="arcade palette"></button>
+    </div>
+    <button class="lang" id="lang" aria-label="language">TR</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- *-*-*-*-*-*-*-*-*-*-*-* home *-*-*-*-*-*-*-*-*-*-*-* -->
+  <section class="screen" id="home">
+    <div class="home-copy">
+      <h1 data-i18n="tagline">one board, two players, two pieces falling at once.</h1>
+      <p class="lead" data-i18n="how">open a room, your friend scans the QR, and you stack together. fill a row from wall to wall and it pops.</p>
+
+      <label class="field">
+        <span data-i18n="yourName">your name</span>
+        <input id="name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="dew">
+      </label>
+
+      <div id="create-box">
+        <button class="btn" id="create" data-i18n="create">open a room</button>
+        <div class="joinrow">
+          <label class="field small">
+            <span data-i18n="haveCode">got a code?</span>
+            <input id="code" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD">
+          </label>
+          <button class="btn ghost" id="join-code" data-i18n="join">join</button>
+        </div>
+      </div>
+
+      <div id="join-box" hidden>
+        <p class="roomline"><span data-i18n="room">room</span> <b id="join-room"></b></p>
+        <button class="btn" id="join" data-i18n="joinRoom">join the room</button>
+      </div>
+
+      <p class="status" id="home-status" role="status"></p>
+    </div>
+    <div class="home-demo" aria-hidden="true">
+      <canvas id="demo"></canvas>
+    </div>
+  </section>
+
+  <!-- *-*-*-*-*-*-*-*-*-*-*-* lobby *-*-*-*-*-*-*-*-*-*-*-* -->
+  <section class="screen" id="lobby" hidden>
+    <div class="lobby-qr" id="lobby-qr">
+      <canvas id="qr" width="10" height="10"></canvas>
+    </div>
+    <div class="lobby-info">
+      <p class="eyebrow" data-i18n="roomCode">room code</p>
+      <p class="code" id="room-code"></p>
+      <p class="lead" id="lobby-hint" data-i18n="scan">scan the QR with a phone camera, or type the code at this address.</p>
+      <button class="btn ghost" id="copy" data-i18n="copy">copy link</button>
+
+      <ul class="slots">
+        <li class="slot p1"><span class="chip"></span><span id="slot-0">...</span></li>
+        <li class="slot p2"><span class="chip"></span><span id="slot-1" class="waiting" data-i18n="waiting">waiting for player two</span></li>
+      </ul>
+
+      <button class="btn" id="start" disabled data-i18n="start">start</button>
+      <p class="status" id="lobby-status" role="status"></p>
+    </div>
+  </section>
+
+  <!-- *-*-*-*-*-*-*-*-*-*-*-* game *-*-*-*-*-*-*-*-*-*-*-* -->
+  <section class="screen" id="game" hidden>
+    <div class="hud">
+      <div><span data-i18n="score">score</span><b id="hud-score">0</b></div>
+      <div><span data-i18n="level">level</span><b id="hud-level">1</b></div>
+      <div><span data-i18n="lines">rows</span><b id="hud-lines">0</b></div>
+    </div>
+
+    <aside class="card p1" id="card-0">
+      <p class="who"><span class="chip"></span><b class="pname"></b><em class="you" data-i18n="you" hidden>you</em></p>
+      <canvas class="next" width="10" height="10"></canvas>
+      <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
+    </aside>
+
+    <div class="boardwrap" id="boardwrap">
+      <canvas id="board"></canvas>
+      <div class="overlay" id="overlay" hidden>
+        <p class="eyebrow" id="ov-title"></p>
+        <p class="code" id="ov-score"></p>
+        <p class="lead" id="ov-detail"></p>
+        <button class="btn" id="again" data-i18n="again">play again</button>
+      </div>
+    </div>
+
+    <aside class="card p2" id="card-1">
+      <p class="who"><span class="chip"></span><b class="pname"></b><em class="you" data-i18n="you" hidden>you</em></p>
+      <canvas class="next" width="10" height="10"></canvas>
+      <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
+    </aside>
+
+    <p class="keys" data-i18n="keys">arrows or WASD to move, up to turn, space to drop</p>
+
+    <div class="pad" id="pad">
+      <button data-act="L" aria-label="left">&#9664;</button>
+      <button data-act="R" aria-label="right">&#9654;</button>
+      <button data-act="rot" aria-label="turn">&#8635;</button>
+      <button data-act="D" aria-label="down">&#9660;</button>
+      <button data-act="drop" class="wide" data-i18n="drop">drop</button>
+    </div>
+  </section>
+
+</main>
+
+<script src="vendor/qrcode.min.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

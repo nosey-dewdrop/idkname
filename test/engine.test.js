@@ -1,0 +1,74 @@
+// *-*-*-*-*-*-*-*-*-*-*-* engine checks *-*-*-*-*-*-*-*-*-*-*-*
+// run: node test/engine.test.js
+
+const E = require('../engine.js');
+const assert = require('assert');
+
+function overlapCheck(s) {
+  const seen = {};
+  for (let i = 0; i < 2; i++) {
+    const p = s.players[i].piece;
+    if (!p) { continue; }
+    for (const c of p.cells) {
+      const x = p.x + c[0];
+      const y = p.y + c[1];
+      assert(x >= 0 && x < E.W && y >= 0 && y < E.H, 'piece out of board');
+      assert(s.board[y][x] === 0, 'piece inside locked cell');
+      const k = x + ',' + y;
+      assert(!seen[k], 'two pieces share a cell');
+      seen[k] = true;
+    }
+  }
+}
+
+// *-*-*-*-*-*-*-*-*-*-*-* random play never breaks the rules *-*-*-*-*-*-*-*-*-*-*-*
+const ACTIONS = ['L', 'R', 'D', 'rot', 'drop'];
+let games = 0;
+let totalLines = 0;
+let s = E.newGame(['a', 'b']);
+for (let i = 0; i < 200000; i++) {
+  if (Math.random() < 0.5) {
+    E.input(s, Math.random() < 0.5 ? 0 : 1, ACTIONS[Math.floor(Math.random() * 4.2)]);
+  }
+  E.step(s, 16);
+  if (!s.over) { overlapCheck(s); }
+  if (s.over) {
+    games++;
+    totalLines += s.lines;
+    s = E.newGame(['a', 'b']);
+  }
+}
+assert(games > 0, 'random play should end some games');
+
+// *-*-*-*-*-*-*-*-*-*-*-* a full row clears and counts for the player who closed it *-*-*-*-*-*-*-*-*-*-*-*
+s = E.newGame(['a', 'b']);
+for (let x = 0; x < E.W - 3; x++) { s.board[E.H - 1][x] = 1; }
+s.players[1].next = { kind: 'bar3', cells: [[0, 0], [1, 0], [2, 0]] };
+E.step(s, 16);
+const p = s.players[1].piece;
+assert.strictEqual(p.kind, 'bar3');
+while (p.x < E.W - 3) { assert(E.input(s, 1, 'R')); }
+E.input(s, 1, 'drop');
+assert(s.clearing && s.clearing.rows[0] === E.H - 1, 'row should be clearing');
+for (let i = 0; i < 40; i++) { E.step(s, 16); }
+assert.strictEqual(s.lines, 1);
+assert.strictEqual(s.players[1].lines, 1);
+assert.strictEqual(s.players[0].lines, 0);
+assert.strictEqual(s.score >= 100, true);
+assert(s.board[E.H - 1].every(function (v) { return v === 0; }), 'bottom row empty after clear');
+
+// *-*-*-*-*-*-*-*-*-*-*-* a piece resting on the partner's piece does not lock *-*-*-*-*-*-*-*-*-*-*-*
+s = E.newGame(['a', 'b']);
+s.players[0].next = { kind: 'box', cells: [[0, 0], [1, 0], [0, 1], [1, 1]] };
+s.players[1].next = { kind: 'box', cells: [[0, 0], [1, 0], [0, 1], [1, 1]] };
+E.step(s, 16);
+const a = s.players[0].piece;
+const b = s.players[1].piece;
+for (let i = 0; i < 4; i++) { E.input(s, 1, 'D'); }
+while (a.x < b.x) { E.input(s, 0, 'R'); }
+assert.strictEqual(a.x, b.x);
+E.input(s, 0, 'drop');
+assert(s.players[0].piece === a, 'top piece must stay alive on top of partner');
+assert.strictEqual(a.y + 2, b.y);
+
+console.log('engine ok, random games finished: ' + games + ', lines cleared by random play: ' + totalLines);
