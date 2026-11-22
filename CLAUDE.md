@@ -12,4 +12,6 @@ HEDEF (Damla, 22 Kas 2026): "iki kişi beraber oynuyor, QR okutur odaya dahil ol
 - Oda sahibi motoru koşturur, misafir yalnız hamle yollar; bağlantı PeerJS (WebRTC), sunucumuz yok.
 - Çalıştır: `python3 -m http.server <boş port> --bind 0.0.0.0`, telefon için ağ adresinden aç.
 - Test: `node test/engine.test.js`, `CHROME=<chromium> NODE_PATH=<playwright-core>/node_modules node test/e2e.js <url> <görüntü klasörü>`.
-- Yayında değil. Ad Damla'nın: idkname (22 Kas 2026). "tetris" kelimesi ada girmez, başkasının markası.
+- Telefon kontrolü: `test/phone.js` canlı QR'ı piksellerinden çözer, iPhone profiliyle Safari motorunda (playwright webkit) odaya girip dokunmatik oynar. Gerçek cihaz ve mobil veri ağı bununla ölçülmez.
+- YAYINDA (23 Kas 2026, Damla "deploy et"): https://idkname.vercel.app , `vercel deploy --prod --yes`. Repo github.com/nosey-dewdrop/idkname (private). `.rabadon/` repoya ve yayına girmez.
+- Ad Damla'nın: idkname (22 Kas 2026). "tetris" kelimesi ada girmez, başkasının markası.
