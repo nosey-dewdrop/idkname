@@ -207,6 +207,7 @@ kbd.space { width: 66px; }
   font-size: var(--t4); line-height: 1.05; padding: 5px 10px 8px; overflow-wrap: anywhere;
   color: var(--face); box-shadow: 0 4px 0 rgba(0, 0, 0, .3);
 }
+#game:has(.overlay:not([hidden])) .say { display: none; }
 .say.p1 { background: var(--p1l); }
 .say.p2 { background: var(--p2l); }
 .say::after { content: ""; position: absolute; left: var(--tail, 12px); top: 100%; width: 8px; height: 8px; background: inherit; }

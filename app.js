@@ -31,6 +31,8 @@
       over: 'the stack reached the top', overDetail: '{a} closed {x} rows, {b} closed {y}, {z} of them together.',
       waitHost: 'the host can start another round.',
       partnerLeft: 'your partner dropped out', partnerLeftDetail: 'paused. they can come back with the code {code}.',
+      awayYou: 'are you there?', awayYouDetail: 'paused. press any key to keep playing.',
+      awayOther: '{name} is away', awayOtherDetail: 'paused. the game goes on when they are back.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores',
       together: 'together', kSwap: 'swap next', kChat: 'chat', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
@@ -64,6 +66,8 @@
       over: 'yığın tepeye ulaştı', overDetail: '{a} {x} sıra kapattı, {b} {y} sıra kapattı, {z} tanesi birlikte.',
       waitHost: 'oda sahibi yeni tur başlatabilir.',
       partnerLeft: 'arkadaşın oyundan düştü', partnerLeftDetail: 'duraklatıldı. {code} koduyla geri gelebilir.',
+      awayYou: 'orada mısın?', awayYouDetail: 'duraklatıldı. devam etmek için bir tuşa bas.',
+      awayOther: '{name} uzakta', awayOtherDetail: 'duraklatıldı. geri gelince oyun devam eder.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar',
       together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
@@ -144,6 +148,7 @@
   let ac = null;
   let muted = store('idkname-mute') === '1';
   function wake() {
+    stillHere();
     if (ac || muted) { return; }
     const A = window.AudioContext || window.webkitAudioContext;
     if (A) { ac = new A(); }
@@ -240,6 +245,13 @@
   let gameDiff = savedDiff === 0 || savedDiff === 2 ? savedDiff : 1;
   let dirty = false;
   let lastSend = 0;
+  // *-*-*-*-*-*-*-*-*-*-*-* away: a player who touches nothing for a while pauses the game, it never ends it *-*-*-*-*-*-*-*-*-*-*-*
+  let AWAY_MS = 20000;
+  let away = -1;          // which player is away, -1 nobody. the host decides, everyone is told with the board.
+  let seen = [0, 0];      // host: when each player last touched anything
+  let awaySeat = false;   // host: the computer is keeping an away guest's seat
+  let guestName = '';
+  let lastHere = 0;
   let guestAck = 0;       // host: the last guest move it has applied
   let moveN = 0;          // guest: counts its own moves
   let pending = [];       // guest: moves sent but not yet seen in a snapshot
@@ -309,6 +321,10 @@
           guestAck = 0;
           lastHeard = c._last;
           names[1] = String(m.name || 'p2').slice(0, 12);
+          guestName = names[1];
+          seen = [performance.now(), performance.now()];
+          away = -1;
+          awaySeat = false;
           botOn = false;
           SFX.join();
           if (state) {
@@ -334,6 +350,7 @@
         return;
       }
       if (c !== conn) { return; }
+      if (m.t === 'in' || m.t === 'chat' || m.t === 'here') { markHere(1); }
       if (m.t === 'chat') {
         hostSay(1, m.m);
         return;
@@ -357,6 +374,26 @@
     });
   }
 
+  // host: a player touched something. if they were the one away, the game goes on; an away guest gets the seat back.
+  function markHere(i) {
+    const now = performance.now();
+    seen[i] = now;
+    if (i === 1 && awaySeat && botOn && state) {
+      awaySeat = false;
+      botOn = false;
+      names[1] = guestName;
+      state.players[1].name = guestName;
+      sendLobby();
+      sendState(true);
+    }
+    if (away !== i) { return; }
+    away = -1;
+    paused = false;
+    seen = [now, now];
+    refreshOverlay();
+    sendState(true);
+  }
+
   function links() {
     const all = watchers.filter(function (w) { return w.open; });
     if (conn && conn.open) { all.unshift(conn); }
@@ -372,6 +409,7 @@
   function hostDrop(c) {
     if (c !== conn) { return; }
     conn = null;
+    away = -1;
     names[1] = '';
     if (state && !state.over) { paused = true; }
     renderLobby();
@@ -396,7 +434,9 @@
     dirty = false;
     const snap = E.snapshot(state);
     const msg = { t: 'state', s: snap };
-    for (const c of all) { c.send(c === conn ? { t: 'state', s: snap, k: guestAck } : msg); }
+    const msg2 = { t: 'state', s: snap, w: away, k: guestAck };
+    msg.w = away;
+    for (const c of all) { c.send(c === conn ? msg2 : msg); }
   }
 
   function hostStart(withBot) {
@@ -407,6 +447,9 @@
     state = E.newGame(names, gameDiff);
     view = state;
     paused = false;
+    away = -1;
+    awaySeat = false;
+    seen = [performance.now(), performance.now()];
     botClock = 0;
     lastRun = null;
     show('game');
@@ -419,6 +462,18 @@
       const dt = Math.min(100, now - last);
       last = now;
       if (paused) { return; }
+      if (state.started && !state.over) {
+        for (let i = 0; i < 2; i++) {
+          if (i === 1 && (botOn || !conn || !conn.open)) { continue; }
+          if (now - seen[i] > AWAY_MS) {
+            away = i;
+            paused = true;
+            refreshOverlay();
+            sendState(true);
+            return;
+          }
+        }
+      }
       // strict turns: the computer only plays after the human has placed a piece, never before.
       // until then its piece hangs at the top with its eyes closed. it lowers its piece step by step.
       const waitNow = botOn && state.players[1].locks >= state.players[0].locks;
@@ -500,6 +555,7 @@
         refreshOverlay();
       } else if (m.t === 'state') {
         view = m.s;
+        away = typeof m.w === 'number' ? m.w : -1;
         if (me === 1) {
           pending = pending.filter(function (q) { return q.n > (m.k || 0); });
           for (const q of pending) { predict(view, q.a); }
@@ -853,6 +909,13 @@
       });
       $('ov-detail').textContent = role === 'host' ? d : d + ' ' + t('waitHost');
       $('again').hidden = role !== 'host' || !names[1];
+    } else if (away >= 0) {
+      ov.hidden = false;
+      $('ov-title').textContent = away === me ? t('awayYou') : t('awayOther', { name: view.players[away].name });
+      $('ov-score').hidden = true;
+      $('ov-detail').textContent = t(away === me ? 'awayYouDetail' : 'awayOtherDetail');
+      $('again').hidden = true;
+      $('bot-take').hidden = !(role === 'host' && away === 1);
     } else if (role === 'host' && paused) {
       ov.hidden = false;
       $('ov-title').textContent = t('partnerLeft');
@@ -1082,7 +1145,7 @@
     for (let i = 0; i < 2; i++) {
       const p = s.players[i].piece;
       if (!p) { continue; }
-      const closed = s.players[i].wait || (now + i * 1700) % 3400 < 130;
+      const closed = s.players[i].wait || away === i || (now + i * 1700) % 3400 < 130;
       for (let j = 0; j < p.cells.length; j++) {
         block(ctx, (p.x + p.cells[j][0]) * c, (p.y + p.cells[j][1]) * c, c, i + 1, j === 1 ? (closed ? 2 : 1) : 0);
       }
@@ -1393,6 +1456,19 @@
   }
 
   // the guest moves its own piece on its own screen right away; the host's next snapshot confirms or corrects it.
+  // any key or touch counts as being here. the guest tells the host, at most every two seconds.
+  function stillHere() {
+    if (role === 'host') {
+      if (state) { markHere(0); }
+      return;
+    }
+    const now = performance.now();
+    if (me === 1 && conn && conn.open && now - lastHere > 2000) {
+      lastHere = now;
+      conn.send({ t: 'here' });
+    }
+  }
+
   function predict(v, a) {
     const p = v.players[1].piece;
     if (!p || v.over || v.clearing || !v.started) { return; }
@@ -1499,10 +1575,15 @@
   $('again').addEventListener('click', function () { hostStart(botOn); });
   $('bot-take').addEventListener('click', function () {
     botOn = true;
+    awaySeat = away === 1;
+    away = -1;
+    seen[0] = performance.now();
     names[1] = BOT_NAME;
     state.players[1].name = BOT_NAME;
     paused = false;
     refreshOverlay();
+    sendLobby();
+    sendState(true);
   });
   $('chat-in').addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') {
@@ -1642,5 +1723,5 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, heard: function () { return heardN; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; } };
 })();

@@ -150,6 +150,26 @@ const shots = process.argv[3];
   await guest.screenshot({ path: shots + '/5a-chat-phone.png' });
   console.log('chat went both ways, bubbles on both boards');
 
+  // *-*-*-*-*-*-*-*-*-*-*-* away: the guest touches nothing, the game pauses on both screens and goes on when they are back *-*-*-*-*-*-*-*-*-*-*-*
+  await host.evaluate(function () { window.__idkname.setAway(1500); });
+  for (let i = 0; i < 12 && (await host.evaluate(function () { return window.__idkname.away(); })) !== 1; i++) {
+    await host.keyboard.press(i % 2 ? 'ArrowLeft' : 'ArrowRight');
+    await host.waitForTimeout(250);
+  }
+  assert.strictEqual(await host.evaluate(function () { return window.__idkname.away(); }), 1, 'the idle guest is marked away');
+  assert.strictEqual(await host.evaluate(function () { return window.__idkname.paused(); }), true);
+  await guest.waitForFunction(function () { return window.__idkname.away() === 1 && !document.getElementById('overlay').hidden; }, null, { timeout: 5000 });
+  const awayScore = await host.evaluate(function () { return window.__idkname.view().score; });
+  await host.screenshot({ path: shots + '/5d-away-desktop.png' });
+  await guest.screenshot({ path: shots + '/5d-away-phone.png' });
+  await host.evaluate(function () { window.__idkname.setAway(20000); });
+  await guest.tap('#pad [data-act="L"]');
+  await host.waitForFunction(function () { return window.__idkname.away() === -1 && !window.__idkname.paused(); }, null, { timeout: 5000 });
+  await guest.waitForFunction(function () { return document.getElementById('overlay').hidden; }, null, { timeout: 5000 });
+  assert.ok(await host.evaluate(function () { return !window.__idkname.view().over; }), 'being away never ends the game');
+  assert.ok((await host.evaluate(function () { return window.__idkname.view().score; })) >= awayScore);
+  console.log('idle guest paused the game on both screens, one touch brought it back');
+
   // *-*-*-*-*-*-*-*-*-*-*-* a third person with the same link watches and cheers *-*-*-*-*-*-*-*-*-*-*-*
   const watchCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
   const watcher = await watchCtx.newPage();
