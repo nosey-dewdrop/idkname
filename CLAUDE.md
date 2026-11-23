@@ -4,7 +4,7 @@
 
 HEDEF (Damla, 22 Kas 2026): "iki kişi beraber oynuyor, QR okutur odaya dahil olur gibi". Ölçü: `test/e2e.js` iki tarayıcıyla oda açma, katılma, karşılıklı hamle, oyun sonu, tekrar, kopup geri gelme adımlarını geçiyor mu. Bu test iki tarayıcıyı aynı makineden koşturur; ayrı ağdaki iki gerçek cihaz bununla ölçülmez.
 
-- Statik site, build yok. `engine.js` kurallar (saf), `app.js` ekranlar + çizim, `net.js` bağlantı, `vendor/` qrcode.
+- Statik site, build yok. `engine.js` kurallar (saf), `app.js` ekranlar + çizim, `net.js` bağlantı, `vendor/` qrcode ve font.
 - `bot.js` bilgisayar oyuncu (pix): ana ekrandan, bekleme odasından ya da arkadaş düşünce devreye girer. Ölçü: iki bot kaç sıra kapatıyor (`test/engine.test.js`).
 - Görünüm kararları (23 Kas 2026, Damla "slop gibi durmasın, premium oyun gibi"): tek font Jersey 15, dört boyut, metin yalnız beyaz/gri, renk bloklarda; logo blok harfler, i'nin noktası yüzlü blok; ses ve efektler `app.js` içinde.
 - Birlikte oynama kuralları (23 Kas 2026): iki rengin de bulunduğu sıra ek puan verir; `c` ile sıradaki parçalar takas edilir (parça başına bir kez); dolu odaya aynı bağlantıyla giren seyirci olur, oynayamaz, tepki atar.
@@ -15,6 +15,7 @@ HEDEF (Damla, 22 Kas 2026): "iki kişi beraber oynuyor, QR okutur odaya dahil ol
 - Sohbet (23 Kas 2026, Damla "ikili chat ekle"): iki oyuncu arasında, bilgisayarla oynarken yok. Mesaj tahtada konuşanın yüzlü bloğunun yanında balon olur (4 sn), masaüstünde sağda son dört satır ve yazma alanı, telefonda tahta ile tuşlar arasında yazma alanı. `enter` yazmaya geçer ve yollar, yazarken parça oynamaz. Seyirci balonları görür, yazamaz.
 - Hız (23 Kas 2026, Damla "down arrow hızlı çalışmalı, rakibin bloğunun sesini duymalıyız"): basılı tuşun tekrarı bizim (aşağı 70 ms sonra 30 ms'de bir, sağ sol 140 ms sonra 45 ms'de bir); misafir kendi hamlesini anında kendi ekranında çizer, oda sahibinin tahtası onaylar ya da düzeltir (`predict`, hamle numarası `n`, onay `k`); arkadaşın parçası oynayınca ve dönünce daha kalın ve kısık bir ses çıkar. C++'a geçilmedi, yavaşlık ağdan ve klavye tekrarındandı.
 - Uzakta (23 Kas 2026, Damla "afk raporlaması, afk olduğunda oyun bitirilsin mi, mekanik ne olsun"; karar asistanın): 20 sn hiçbir tuşa ya da ekrana dokunmayan oyuncu uzakta sayılır. Oyun bitmez, iki ekranda da durur, "{ad} uzakta" yazar, parçasının gözleri kapanır. Dokunduğu an devam eder. Uzakta olan misafirse oda sahibi "bilgisayarla devam et" diyebilir; misafir dönünce yerini geri alır. Yazı yazmak da burada olmak sayılır.
+- Font siteden gelir (24 Kas 2026): Jersey 15 `vendor/` altında, lisansı yanında. Google Fonts'a ulaşılamayan ağda sayfa açılmadan bekliyordu; dışarıdan yüklenen hiçbir dosya kalmadı.
 - Çalıştır: `python3 -m http.server <boş port> --bind 0.0.0.0`, telefon için ağ adresinden aç.
 - Test: `node test/engine.test.js`, `CHROME=<chromium> NODE_PATH=<playwright-core>/node_modules node test/e2e.js <url> <görüntü klasörü>`.
 - Telefon kontrolü: `test/phone.js` canlı QR'ı piksellerinden çözer, iPhone profiliyle Safari motorunda (playwright webkit) odaya girip dokunmatik oynar. Gerçek cihaz ve mobil veri ağı bununla ölçülmez.
