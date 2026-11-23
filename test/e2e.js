@@ -95,9 +95,15 @@ const shots = process.argv[3];
 
   // host moves with the keyboard; guest must see it.
   const h0 = await host.evaluate(function () { return window.__idkname.view().players[0].piece.x; });
-  await host.keyboard.press('ArrowRight');
-  await guest.waitForFunction(function (x) { const p = window.__idkname.view().players[0].piece; return p && p.x === x + 1; }, h0, { timeout: 5000 });
-  console.log('host input reached the guest board: x ' + h0 + ' -> ' + (h0 + 1));
+  // the partner's piece can stand in the way (a bar next to it cannot step right), so the host steps to the free side.
+  const goRight = await host.evaluate(function () {
+    const v = window.__idkname.view();
+    const p = v.players[0].piece;
+    return !window.Engine.hit(v, 0, p.cells, p.x + 1, p.y);
+  });
+  await host.keyboard.press(goRight ? 'ArrowRight' : 'ArrowLeft');
+  await guest.waitForFunction(function (a) { const p = window.__idkname.view().players[0].piece; return p && (a[1] ? p.x > a[0] : p.x < a[0]); }, [h0, goRight], { timeout: 5000 });
+  console.log('host input reached the guest board: x moved ' + (goRight ? 'right' : 'left') + ' from ' + h0);
 
   // *-*-*-*-*-*-*-*-*-*-*-* speed: the guest sees its own move at once; holding down falls fast *-*-*-*-*-*-*-*-*-*-*-*
   const own = await guest.evaluate(function () {
@@ -112,10 +118,12 @@ const shots = process.argv[3];
   await guest.waitForTimeout(300);
   assert.strictEqual(await guest.evaluate(function () { return window.__idkname.view().players[1].piece.x; }), own[1], 'the host agrees, no snap back');
   const h1 = await host.evaluate(function () { return window.__idkname.heard(); });
-  await guest.tap('#pad [data-act="rot"]');
+  // one sound per drawn frame, so each move waits for its own sound. a box does not turn, so this uses moves only.
   await guest.tap('#pad [data-act="L"]');
+  await host.waitForFunction(function (n) { return window.__idkname.heard() >= n + 1; }, h1, { timeout: 5000 });
+  await guest.tap('#pad [data-act="R"]');
   await host.waitForFunction(function (n) { return window.__idkname.heard() >= n + 2; }, h1, { timeout: 5000 });
-  console.log('host hears the partner piece turn and move');
+  console.log('host hears the partner piece move');
   const y0 = await host.evaluate(function () { return window.__idkname.view().players[0].piece.y; });
   await host.keyboard.down('ArrowDown');
   await host.waitForTimeout(300);
