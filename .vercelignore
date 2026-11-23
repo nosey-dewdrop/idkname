@@ -5,3 +5,4 @@ CLAUDE.md
 .env.local
 .env*.local
 node_modules
+relay

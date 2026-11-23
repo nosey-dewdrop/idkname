@@ -6,7 +6,6 @@
   const E = window.Engine;
   const Bot = window.Bot;
   const $ = function (id) { return document.getElementById(id); };
-  const PEER_PREFIX = 'idkname-room-';
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const BOT_NAME = 'pix';
   const STILL = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -275,15 +274,12 @@
     names[0] = myName();
     store('idkname-name', $('name').value.trim());
     $('home-status').textContent = t('opening');
-    peer = new Peer(PEER_PREFIX + code);
+    peer = Net.host(code);
     peer.on('open', function () {
       $('home-status').textContent = '';
       enterLobby();
     });
     peer.on('connection', hostAccept);
-    peer.on('disconnected', function () {
-      if (peer && !peer.destroyed) { peer.reconnect(); }
-    });
     peer.on('error', function (err) {
       if (err.type === 'unavailable-id' && tries < 5) {
         peer.destroy();
@@ -444,26 +440,21 @@
     store('idkname-name', $('name').value.trim());
     $('home-status').textContent = t('joining');
     if (peer) { peer.destroy(); }
-    peer = new Peer();
-    peer.on('open', guestConnect);
-    peer.on('error', function (err) {
-      if (err.type === 'peer-unavailable') {
-        if (linkLost) {
-          setTimeout(guestConnect, 1500);
-          return;
-        }
-        $('home-status').textContent = t('noRoom');
-      } else if ($('home').hidden === false) {
-        $('home-status').textContent = t('netDown');
-      }
-    });
-    peer.on('disconnected', function () {
-      if (peer && !peer.destroyed) { peer.reconnect(); }
-    });
+    peer = null;
+    linkLost = false;
+    guestConnect();
   }
 
   function guestConnect() {
-    const c = peer.connect(PEER_PREFIX + code, { reliable: true });
+    const c = Net.join(code);
+    c.on('error', function (err) {
+      // once we have been in the room, keep knocking until the host is back.
+      if (linkLost) {
+        setTimeout(guestConnect, 1500);
+        return;
+      }
+      $('home-status').textContent = t(err.type === 'peer-unavailable' ? 'noRoom' : err.type === 'full' ? 'full' : 'netDown');
+    });
     c.on('open', function () {
       conn = c;
       linkLost = false;
