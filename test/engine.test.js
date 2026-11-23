@@ -128,6 +128,34 @@ for (let i = 0; i < 60000 && botGames < 5; i++) {
     s = E.newGame(['a', 'b']);
   }
 }
+// *-*-*-*-*-*-*-*-*-*-*-* difficulty changes the pieces and the fall speed *-*-*-*-*-*-*-*-*-*-*-*
+{
+  const cellsSeen = [new Set(), new Set(), new Set()];
+  for (let d = 0; d < 3; d++) {
+    const g = E.newGame(['a', 'b'], d);
+    assert.strictEqual(g.diff, d);
+    assert.strictEqual(E.snapshot(g).diff, d);
+    for (let i = 0; i < 400; i++) {
+      cellsSeen[d].add(g.players[0].next.cells.length);
+      g.players[0].piece = null;
+      E.step(g, 16);
+      g.players[0].piece = null;
+    }
+  }
+  assert.deepStrictEqual(Array.from(cellsSeen[0]).sort(), [3, 4], 'easy: three and four block pieces');
+  assert.deepStrictEqual(Array.from(cellsSeen[1]).sort(), [4], 'normal: only four block pieces');
+  assert.deepStrictEqual(Array.from(cellsSeen[2]).sort(), [4, 5], 'hard: four and five block pieces');
+  const e = E.newGame(['a', 'b'], 0);
+  const n = E.newGame(['a', 'b']);
+  const h = E.newGame(['a', 'b'], 2);
+  assert.strictEqual(n.diff, 1, 'normal is the default');
+  assert(E.interval(e) > E.interval(n) && E.interval(n) > E.interval(h), 'harder falls faster');
+  E.setDiff(n, 2);
+  assert.strictEqual(E.interval(n), E.interval(h), 'a mid game change sets the speed at once');
+  assert.strictEqual(n.players[0].bag.length, 0, 'and empties the bags so the next draw follows it');
+  console.log('difficulty ok, fall ms at level 1: ' + [E.interval(e), E.interval(E.newGame(['a', 'b'])), E.interval(h)].join(' / '));
+}
+
 botLines += s.lines;
 assert(botLines >= 20, 'bots cleared only ' + botLines + ' rows');
 console.log('bots ok, rows cleared: ' + botLines + ' in ' + (botGames + 1) + ' games');

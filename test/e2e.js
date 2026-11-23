@@ -43,6 +43,21 @@ const shots = process.argv[3];
     await mid.waitForTimeout(700);
   }
   await mid.screenshot({ path: shots + '/0-solo-1000.png' });
+  // difficulty: the button changes the running game, the ? explains it and stays on the screen.
+  assert.strictEqual(await mid.evaluate(function () { return window.__idkname.view().diff; }), 1, 'normal is the default');
+  await mid.click('#set-help');
+  assert((await mid.textContent('#help-box li.on')).startsWith('normal.'));
+  await mid.click('#diff');
+  assert.strictEqual(await mid.evaluate(function () { return window.__idkname.view().diff; }), 2, 'the button did not reach the game');
+  assert((await mid.textContent('#help-box li.on')).startsWith('hard.'));
+  const helpFits = await mid.evaluate(function () {
+    const r = document.getElementById('help-box').getBoundingClientRect();
+    return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+  });
+  assert(helpFits, 'the help panel runs off the screen');
+  await mid.screenshot({ path: shots + '/0b-difficulty-help-1000.png' });
+  console.log('difficulty button reaches the game, help panel fits');
+  await mid.evaluate(function () { localStorage.removeItem('idkname-diff'); });
   await midCtx.close();
 
   await host.goto(base);

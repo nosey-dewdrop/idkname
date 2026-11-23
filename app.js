@@ -37,6 +37,13 @@
       together: 'together', kSwap: 'swap next', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
+      diffEasy: 'difficulty: easy', diffNormal: 'difficulty: normal', diffHard: 'difficulty: hard',
+      helpAsk: 'what do these change?',
+      hEasy: 'easy. three block pieces join in, slower fall.',
+      hNormal: 'normal. classic four block pieces.',
+      hHard: 'hard. five block pieces join in, faster fall.',
+      hSkill: 'level. how well pix picks its spot.',
+      hSpeed: 'speed. how fast pix moves.',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
     },
     tr: {
@@ -63,6 +70,13 @@
       together: 'birlikte', kSwap: 'sıradakini takas et', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
+      diffEasy: 'zorluk: kolay', diffNormal: 'zorluk: normal', diffHard: 'zorluk: zor',
+      helpAsk: 'bunlar neyi değiştiriyor?',
+      hEasy: 'kolay. üç bloklu parçalar da gelir, yavaş düşer.',
+      hNormal: 'normal. klasik dört bloklu parçalar.',
+      hHard: 'zor. beş bloklu parçalar da gelir, hızlı düşer.',
+      hSkill: 'seviye. pix yerini ne kadar iyi seçer.',
+      hSpeed: 'hız. pix ne kadar hızlı oynar.',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
     }
   };
@@ -92,6 +106,8 @@
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
     $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
     $('bot-skill').textContent = t(BOT_SKILL_WORD[botSkill]);
+    $('diff').textContent = t(DIFF_WORD[gameDiff]);
+    renderHelp();
     refreshOverlay();
   }
 
@@ -107,6 +123,9 @@
     star: ['...#...', '..###..', '#######', '.#####.', '.#####.', '.##.##.', '##...##'],
     bang: ['..###..', '..###..', '..###..', '..###..', '..###..', '.......', '..###..'],
     face: ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.###.#', '#.....#', '.#####.'],
+    p3: ['...', '#..', '##.'],
+    p4: ['...', '.#.', '###'],
+    p5: ['.#.', '###', '.#.'],
     soundOn: ['...#....', '..##..#.', '####.#.#', '####...#', '####.#.#', '..##..#.', '...#....'],
     soundOff: ['...#....', '..##....', '####....', '####....', '####....', '..##....', '...#....']
   };
@@ -213,6 +232,9 @@
   const BOT_SKILL_WORD = ['skillEasy', 'skillNormal', 'skillSharp'];
   let botSkill = Math.min(2, Math.max(0, parseInt(store('idkname-bot-skill') || '1', 10) || 0));
   let botSpeed = Math.min(2, Math.max(0, parseInt(store('idkname-bot-speed') || '1', 10) || 0));
+  const DIFF_WORD = ['diffEasy', 'diffNormal', 'diffHard'];
+  const savedDiff = parseInt(store('idkname-diff'), 10);
+  let gameDiff = savedDiff === 0 || savedDiff === 2 ? savedDiff : 1;
   let dirty = false;
   let lastSend = 0;
   let simTimer = null;
@@ -370,7 +392,7 @@
       botOn = true;
       names[1] = BOT_NAME;
     }
-    state = E.newGame(names);
+    state = E.newGame(names, gameDiff);
     view = state;
     paused = false;
     botClock = 0;
@@ -1006,9 +1028,12 @@
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
     drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
-    const showSet = role === 'host' && botOn;
-    if ($('bot-set').hidden === showSet) {
+    const showSet = role === 'host';
+    if ($('bot-set').hidden === showSet || $('bot-skill').hidden === botOn) {
       $('bot-set').hidden = !showSet;
+      $('bot-skill').hidden = !botOn;
+      $('bot-speed').hidden = !botOn;
+      renderHelp();
       fitBoard();
     }
     if (skyTick % 12 === 0) { renderScores(); }
@@ -1291,6 +1316,47 @@
       lastReact = now;
       conn.send({ t: 'react', e: +b.dataset.react });
     });
+  });
+  // *-*-*-*-*-*-*-*-*-*-*-* difficulty and the ? that explains the settings *-*-*-*-*-*-*-*-*-*-*-*
+  function renderHelp() {
+    const rows = [['p3', 'hEasy', gameDiff === 0], ['p4', 'hNormal', gameDiff === 1], ['p5', 'hHard', gameDiff === 2]];
+    if (botOn) {
+      rows.push([null, 'hSkill', false]);
+      rows.push([null, 'hSpeed', false]);
+    }
+    $('help-box').innerHTML = rows.map(function (r) {
+      return '<li' + (r[2] ? ' class="on"' : '') + '><span class="hp">' + (r[0] ? pix(r[0]) : '') + '</span><span>' + t(r[1]) + '</span></li>';
+    }).join('');
+    $('set-help').setAttribute('aria-label', t('helpAsk'));
+    $('set-help').title = t('helpAsk');
+  }
+  $('set-help').addEventListener('click', function () {
+    const open = $('help-box').hidden;
+    $('help-box').hidden = !open;
+    $('set-help').setAttribute('aria-expanded', String(open));
+    $('set-help').blur();
+    fitBoard();
+    fitHelp();
+  });
+  // on a short window the panel keeps to the screen and scrolls inside instead of running off the bottom.
+  function fitHelp() {
+    const box = $('help-box');
+    if (box.hidden) { return; }
+    box.style.maxHeight = '';
+    const room = window.innerHeight - box.getBoundingClientRect().top - 14;
+    if (box.offsetHeight > room) { box.style.maxHeight = Math.max(120, room) + 'px'; }
+  }
+  window.addEventListener('resize', fitHelp);
+  $('diff').addEventListener('click', function () {
+    gameDiff = (gameDiff + 1) % 3;
+    store('idkname-diff', String(gameDiff));
+    $('diff').textContent = t(DIFF_WORD[gameDiff]);
+    if (role === 'host' && state) {
+      E.setDiff(state, gameDiff);
+      dirty = true;
+    }
+    renderHelp();
+    $('diff').blur();
   });
   $('bot-skill').addEventListener('click', function () {
     botSkill = (botSkill + 1) % 3;

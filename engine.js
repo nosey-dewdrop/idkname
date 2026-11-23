@@ -25,7 +25,20 @@
     star: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
     cup: [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1]]
   };
-  const BAG = ['bar3', 'bar4', 'bar4', 'nook', 'box', 'hookA', 'hookB', 'hat', 'stepA', 'stepB', 'star', 'cup'];
+  // *-*-*-*-*-*-*-*-*-*-*-* difficulty *-*-*-*-*-*-*-*-*-*-*-*
+  // 0 easy: three-block pieces mixed in, slow fall. 1 normal: the seven four-block pieces.
+  // 2 hard: five-block pieces join, fast fall.
+  const FOUR = ['bar4', 'box', 'hookA', 'hookB', 'hat', 'stepA', 'stepB'];
+  const BAGS = [
+    FOUR.concat(['bar3', 'bar3', 'nook', 'nook']),
+    FOUR,
+    FOUR.concat(['star', 'cup'])
+  ];
+  const START_MS = [1000, 800, 560];
+
+  function clampDiff(d) {
+    return d === 0 || d === 2 ? d : 1;
+  }
 
   function size(cells) {
     let w = 0;
@@ -42,8 +55,8 @@
     return cells.map(function (c) { return [h - 1 - c[1], c[0]]; });
   }
 
-  function newBag() {
-    const b = BAG.slice();
+  function newBag(diff) {
+    const b = BAGS[clampDiff(diff)].slice();
     for (let i = b.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const t = b[i];
@@ -53,16 +66,17 @@
     return b;
   }
 
-  function draw(player) {
-    if (!player.bag || player.bag.length === 0) { player.bag = newBag(); }
+  function draw(player, diff) {
+    if (!player.bag || player.bag.length === 0) { player.bag = newBag(diff); }
     const kind = player.bag.pop();
     return { kind: kind, cells: SHAPES[kind].map(function (c) { return c.slice(); }) };
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* state *-*-*-*-*-*-*-*-*-*-*-*
-  function newGame(names) {
+  function newGame(names, diff) {
     const s = {
       w: W, h: H,
+      diff: clampDiff(diff),
       board: [],
       players: [],
       score: 0, lines: 0, level: 1,
@@ -74,14 +88,20 @@
     for (let y = 0; y < H; y++) { s.board.push(new Array(W).fill(0)); }
     for (let i = 0; i < 2; i++) {
       const p = { name: names[i], piece: null, next: null, lines: 0, locks: 0, wait: false, swapUsed: false, timer: 0, bag: [] };
-      p.next = draw(p);
+      p.next = draw(p, s.diff);
       s.players.push(p);
     }
     return s;
   }
 
   function interval(s) {
-    return Math.max(90, 800 - (s.level - 1) * 65);
+    return Math.max(90, START_MS[clampDiff(s.diff)] - (s.level - 1) * 65);
+  }
+
+  // the host can change it mid game: the fall speed changes at once, the pieces from the next draw.
+  function setDiff(s, diff) {
+    s.diff = clampDiff(diff);
+    for (const p of s.players) { p.bag = []; }
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* collision *-*-*-*-*-*-*-*-*-*-*-*
@@ -168,7 +188,7 @@
       return true;
     }
     pl.piece = { kind: next.kind, cells: next.cells, x: x, y: 0 };
-    pl.next = draw(pl);
+    pl.next = draw(pl, s.diff);
     pl.timer = 0;
     pl.swapUsed = false;
     return true;
@@ -306,7 +326,7 @@
 
   function snapshot(s) {
     return {
-      w: s.w, h: s.h, board: s.board,
+      w: s.w, h: s.h, board: s.board, diff: s.diff,
       score: s.score, lines: s.lines, level: s.level,
       started: s.started, over: s.over, clearing: s.clearing,
       lockN: s.lockN, lastLock: s.lastLock, clearN: s.clearN, lastClear: s.lastClear,
@@ -318,7 +338,7 @@
   }
 
   const Engine = {
-    W: W, H: H, SHAPES: SHAPES,
+    W: W, H: H, SHAPES: SHAPES, BAGS: BAGS, START_MS: START_MS, setDiff: setDiff,
     newGame: newGame, input: input, step: step, hit: hit,
     landing: landing, snapshot: snapshot, size: size, interval: interval, rotated: rotated
   };
