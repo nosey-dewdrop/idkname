@@ -33,7 +33,7 @@
       partnerLeft: 'your partner dropped out', partnerLeftDetail: 'paused. they can come back with the code {code}.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores',
-      together: 'together', kSwap: 'swap next', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
+      together: 'together', kSwap: 'swap next', kChat: 'chat', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       diffEasy: 'difficulty: easy', diffNormal: 'difficulty: normal', diffHard: 'difficulty: hard',
@@ -66,7 +66,7 @@
       partnerLeft: 'arkadaşın oyundan düştü', partnerLeftDetail: 'duraklatıldı. {code} koduyla geri gelebilir.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar',
-      together: 'birlikte', kSwap: 'sıradakini takas et', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
+      together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       diffEasy: 'zorluk: kolay', diffNormal: 'zorluk: normal', diffHard: 'zorluk: zor',
@@ -103,6 +103,7 @@
       el.textContent = t(el.dataset.i18n);
     });
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
+    $('chat-in').placeholder = t('chatPh');
     $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
     $('bot-skill').textContent = t(BOT_SKILL_WORD[botSkill]);
     $('diff').textContent = t(DIFF_WORD[gameDiff]);
@@ -183,6 +184,7 @@
       tone(440, 0.06, 'square', 0.045, 880);
       tone(880, 0.06, 'square', 0.045, 440, 0.07);
     },
+    say: function () { tone(784, 0.04, 'square', 0.03, 988); },
     cheer: function () { tone(1047, 0.07, 'square', 0.03, 1319); },
     join: function () {
       tone(659, 0.08, 'square', 0.05);
@@ -326,6 +328,10 @@
         return;
       }
       if (c !== conn) { return; }
+      if (m.t === 'chat') {
+        hostSay(1, m.m);
+        return;
+      }
       if (m.t === 'in' && state && !paused && !botOn) {
         if (E.input(state, 1, m.a)) { dirty = true; }
       }
@@ -468,6 +474,8 @@
         show('home');
       } else if (m.t === 'react') {
         showReact(m.e);
+      } else if (m.t === 'chat') {
+        say(m.p, m.m);
       } else if (m.t === 'lobby') {
         names = m.names;
         watchCount = m.w || 0;
@@ -590,6 +598,109 @@
     el.innerHTML = pix(REACTS[e]);
     $('board-frame').appendChild(el);
     setTimeout(function () { el.remove(); }, 1700);
+  }
+
+  // *-*-*-*-*-*-*-*-*-*-*-* chat *-*-*-*-*-*-*-*-*-*-*-*
+  // a line shows as a bubble over the speaker's face block, and stays in the short log beside the board.
+  const SAY_MS = 4200;
+  const sayUntil = [0, 0];
+  let lastSaid = 0;
+
+  function say(pi, text) {
+    pi = pi === 1 ? 1 : 0;
+    text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!text) { return; }
+    SFX.say();
+    const b = $('say-' + pi);
+    b.textContent = text;
+    b.hidden = false;
+    b.classList.remove('pop');
+    void b.offsetWidth;
+    b.classList.add('pop');
+    sayUntil[pi] = performance.now() + SAY_MS;
+    const li = document.createElement('li');
+    const who = document.createElement('b');
+    who.textContent = (view && view.players[pi].name) || names[pi] || ('p' + (pi + 1));
+    const what = document.createElement('span');
+    what.textContent = text;
+    li.appendChild(who);
+    li.appendChild(what);
+    const log = $('chat-log');
+    log.appendChild(li);
+    while (log.children.length > 4) { log.firstChild.remove(); }
+  }
+
+  function hostSay(pi, text) {
+    text = String(text || '').slice(0, 60);
+    say(pi, text);
+    for (const c of links()) { c.send({ t: 'chat', p: pi, m: text }); }
+  }
+
+  function sendChat() {
+    const box = $('chat-in');
+    const text = box.value.trim();
+    const now = performance.now();
+    if (!text || now - lastSaid < 400 || !conn || !conn.open) { return; }
+    lastSaid = now;
+    box.value = '';
+    if (role === 'host') { hostSay(0, text); } else { conn.send({ t: 'chat', m: text }); }
+  }
+
+  // keeps each bubble by its speaker's piece while it falls: over the piece, tail on the face block.
+  function placeSay(now) {
+    const cv = $('board');
+    const frameEl = $('board-frame');
+    const spots = [];
+    for (let i = 0; i < 2; i++) {
+      const b = $('say-' + i);
+      if (b.hidden) { continue; }
+      if (now > sayUntil[i]) {
+        b.hidden = true;
+        continue;
+      }
+      const p = view && view.players[i].piece;
+      const w = b.offsetWidth;
+      const h = b.offsetHeight;
+      let cx = cv.offsetLeft + (i === 0 ? 0.25 : 0.75) * cv.offsetWidth;
+      let top = cv.offsetTop + 2 * cell;
+      let under = false;
+      let below = top + h + 12;
+      if (p && p.cells[1]) {
+        let y0 = 99;
+        let y1 = -99;
+        for (const q of p.cells) {
+          y0 = Math.min(y0, q[1]);
+          y1 = Math.max(y1, q[1]);
+        }
+        cx = cv.offsetLeft + (p.x + p.cells[1][0] + 0.5) * cell;
+        top = cv.offsetTop + (p.y + y0) * cell - h - 12;
+        below = cv.offsetTop + (p.y + y1 + 1) * cell + 12;
+        if (top < 4) {
+          top = below;
+          under = true;
+        }
+      }
+      let left = Math.max(4, Math.min(frameEl.clientWidth - w - 4, cx - w / 2));
+      // two bubbles must not sit on each other: the later one slides aside, or goes under its own piece if there is no room.
+      const o = spots[0];
+      const hits = function () {
+        return o && left < o.left + o.w + 6 && o.left < left + w + 6 && top < o.top + o.h + 6 && o.top < top + h + 6;
+      };
+      if (hits()) {
+        const aside = cx >= o.left + o.w / 2 ? o.left + o.w + 8 : o.left - w - 8;
+        left = Math.max(4, Math.min(frameEl.clientWidth - w - 4, aside));
+        if (hits()) {
+          left = Math.max(4, Math.min(frameEl.clientWidth - w - 4, cx - w / 2));
+          top = under ? o.top + o.h + 12 : below;
+          under = true;
+        }
+      }
+      spots.push({ left: left, top: top, w: w, h: h });
+      b.style.left = Math.round(left) + 'px';
+      b.style.top = Math.round(top) + 'px';
+      b.style.setProperty('--tail', Math.round(Math.max(8, Math.min(w - 16, cx - left - 4))) + 'px');
+      b.classList.toggle('under', under);
+    }
   }
 
   function drawQr(text) {
@@ -1027,6 +1138,14 @@
       renderHelp();
       fitBoard();
     }
+    const talk = me >= 0 && !!conn && conn.open && !(role === 'host' && botOn);
+    if ($('chat').hidden === talk) {
+      $('chat').hidden = !talk;
+      $('legend-chat').hidden = !talk;
+      $('game').classList.toggle('talk', talk);
+      fitBoard();
+    }
+    placeSay(now);
     if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
@@ -1241,6 +1360,12 @@
   window.addEventListener('keydown', function (ev) {
     wake();
     if ($('game').hidden) { return; }
+    if (ev.target === $('chat-in')) { return; }
+    if (ev.key === 'Enter' && !$('chat').hidden && !ev.repeat) {
+      ev.preventDefault();
+      $('chat-in').focus();
+      return;
+    }
     const a = KEYS[ev.key];
     if (!a) { return; }
     ev.preventDefault();
@@ -1297,6 +1422,15 @@
     state.players[1].name = BOT_NAME;
     paused = false;
     refreshOverlay();
+  });
+  $('chat-in').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      sendChat();
+      $('chat-in').blur();
+    } else if (ev.key === 'Escape') {
+      $('chat-in').blur();
+    }
   });
   let lastReact = 0;
   document.querySelectorAll('#reacts button').forEach(function (b) {

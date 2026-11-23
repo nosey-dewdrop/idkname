@@ -116,6 +116,8 @@
     <div class="boardwrap" id="boardwrap">
       <div class="frame" id="board-frame">
         <canvas id="board"></canvas>
+        <p class="say p1" id="say-0" hidden></p>
+        <p class="say p2" id="say-1" hidden></p>
         <div class="overlay" id="overlay" hidden>
           <p class="label" id="ov-title"></p>
           <p class="code" id="ov-score"></p>
@@ -147,7 +149,12 @@
         <li><span class="keys2"><kbd data-icon="down"></kbd></span><span data-i18n="kDown">faster</span></li>
         <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
         <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
+        <li id="legend-chat" hidden><span class="keys2"><kbd class="space">enter</kbd></span><span data-i18n="kChat">chat</span></li>
       </ul>
+      <div class="chat" id="chat" hidden>
+        <ol class="chatlog" id="chat-log" aria-live="polite"></ol>
+        <input id="chat-in" maxlength="60" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something" aria-label="chat">
+      </div>
     </div>
 
     <div class="reacts" id="reacts" hidden>

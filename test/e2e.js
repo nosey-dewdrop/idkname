@@ -107,6 +107,24 @@ const shots = process.argv[3];
   assert.deepStrictEqual(after, [before[1], before[0]]);
   console.log('swap traded next pieces: ' + before.join(' / ') + ' -> ' + after.join(' / '));
 
+  // *-*-*-*-*-*-*-*-*-*-*-* chat: each line shows as a bubble on both boards; typing does not move pieces *-*-*-*-*-*-*-*-*-*-*-*
+  const cx = await host.evaluate(function () { return window.__idkname.view().players[0].piece.x; });
+  await host.keyboard.press('Enter');
+  await host.keyboard.type('add a card here');
+  await host.keyboard.press('Enter');
+  await guest.waitForFunction(function () { const b = document.getElementById('say-0'); return !b.hidden && b.textContent === 'add a card here'; }, null, { timeout: 5000 });
+  assert.strictEqual(await host.evaluate(function () { return window.__idkname.view().players[0].piece.x; }), cx, 'typing in chat must not move the piece');
+  assert.strictEqual(await host.evaluate(function () { return document.activeElement.id; }), '', 'sending hands the keys back to the game');
+  await guest.fill('#chat-in', 'tamam geliyorum');
+  await guest.press('#chat-in', 'Enter');
+  await host.waitForFunction(function () { const b = document.getElementById('say-1'); return !b.hidden && b.textContent === 'tamam geliyorum'; }, null, { timeout: 5000 });
+  assert.strictEqual(await host.evaluate(function () { return document.querySelectorAll('#chat-log li').length; }), 2);
+  await guest.waitForFunction(function () { return !document.getElementById('say-1').hidden; }, null, { timeout: 5000 });
+  await host.waitForTimeout(400);
+  await host.screenshot({ path: shots + '/5a-chat-desktop.png' });
+  await guest.screenshot({ path: shots + '/5a-chat-phone.png' });
+  console.log('chat went both ways, bubbles on both boards');
+
   // *-*-*-*-*-*-*-*-*-*-*-* a third person with the same link watches and cheers *-*-*-*-*-*-*-*-*-*-*-*
   const watchCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
   const watcher = await watchCtx.newPage();
