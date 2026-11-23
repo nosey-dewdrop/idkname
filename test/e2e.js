@@ -99,6 +99,31 @@ const shots = process.argv[3];
   await guest.waitForFunction(function (x) { const p = window.__idkname.view().players[0].piece; return p && p.x === x + 1; }, h0, { timeout: 5000 });
   console.log('host input reached the guest board: x ' + h0 + ' -> ' + (h0 + 1));
 
+  // *-*-*-*-*-*-*-*-*-*-*-* speed: the guest sees its own move at once; holding down falls fast *-*-*-*-*-*-*-*-*-*-*-*
+  const own = await guest.evaluate(function () {
+    const x = window.__idkname.view().players[1].piece.x;
+    document.querySelector('#pad [data-act="R"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const now = window.__idkname.view().players[1].piece.x;
+    document.querySelector('#pad [data-act="R"]').dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    return [x, now];
+  });
+  assert.strictEqual(own[1], own[0] + 1, 'the guest piece moves on its own screen in the same instant');
+  await host.waitForFunction(function (x) { const p = window.__idkname.view().players[1].piece; return p && p.x === x; }, own[1], { timeout: 5000 });
+  await guest.waitForTimeout(300);
+  assert.strictEqual(await guest.evaluate(function () { return window.__idkname.view().players[1].piece.x; }), own[1], 'the host agrees, no snap back');
+  const h1 = await host.evaluate(function () { return window.__idkname.heard(); });
+  await guest.tap('#pad [data-act="rot"]');
+  await guest.tap('#pad [data-act="L"]');
+  await host.waitForFunction(function (n) { return window.__idkname.heard() >= n + 2; }, h1, { timeout: 5000 });
+  console.log('host hears the partner piece turn and move');
+  const y0 = await host.evaluate(function () { return window.__idkname.view().players[0].piece.y; });
+  await host.keyboard.down('ArrowDown');
+  await host.waitForTimeout(300);
+  await host.keyboard.up('ArrowDown');
+  const y1 = await host.evaluate(function () { return window.__idkname.view().players[0].piece.y; });
+  assert.ok(y1 - y0 >= 6, 'holding down for 300 ms falls at least 6 rows, fell ' + (y1 - y0));
+  console.log('guest move shows at once and holds; down held 300 ms fell ' + (y1 - y0) + ' rows');
+
   // *-*-*-*-*-*-*-*-*-*-*-* swap: the guest trades upcoming pieces, both screens agree *-*-*-*-*-*-*-*-*-*-*-*
   const before = await host.evaluate(function () { const v = window.__idkname.view(); return [v.players[0].next.kind, v.players[1].next.kind]; });
   await guest.tap('#pad [data-act="swap"]');

@@ -184,6 +184,8 @@
       tone(440, 0.06, 'square', 0.045, 880);
       tone(880, 0.06, 'square', 0.045, 440, 0.07);
     },
+    move2: function () { tone(220, 0.035, 'square', 0.022); },
+    turn2: function () { tone(370, 0.05, 'square', 0.026, 494); },
     say: function () { tone(784, 0.04, 'square', 0.03, 988); },
     cheer: function () { tone(1047, 0.07, 'square', 0.03, 1319); },
     join: function () {
@@ -238,6 +240,9 @@
   let gameDiff = savedDiff === 0 || savedDiff === 2 ? savedDiff : 1;
   let dirty = false;
   let lastSend = 0;
+  let guestAck = 0;       // host: the last guest move it has applied
+  let moveN = 0;          // guest: counts its own moves
+  let pending = [];       // guest: moves sent but not yet seen in a snapshot
   let simTimer = null;
   let linkLost = false;
   let lastHeard = 0;
@@ -301,6 +306,7 @@
         const seatFree = !conn || !conn.open || conn === c;
         if (seatFree) {
           conn = c;
+          guestAck = 0;
           lastHeard = c._last;
           names[1] = String(m.name || 'p2').slice(0, 12);
           botOn = false;
@@ -332,8 +338,11 @@
         hostSay(1, m.m);
         return;
       }
-      if (m.t === 'in' && state && !paused && !botOn) {
-        if (E.input(state, 1, m.a)) { dirty = true; }
+      if (m.t === 'in') {
+        // the guest draws its own move at once; the number tells it which of its moves this board already holds.
+        guestAck = m.n || 0;
+        if (state && !paused && !botOn && E.input(state, 1, m.a)) { dirty = true; }
+        sendState(true);
       }
     });
     c.on('close', function () {
@@ -385,8 +394,9 @@
     if (!force && now - lastSend < 33) { return; }
     lastSend = now;
     dirty = false;
-    const msg = { t: 'state', s: E.snapshot(state) };
-    for (const c of all) { c.send(msg); }
+    const snap = E.snapshot(state);
+    const msg = { t: 'state', s: snap };
+    for (const c of all) { c.send(c === conn ? { t: 'state', s: snap, k: guestAck } : msg); }
   }
 
   function hostStart(withBot) {
@@ -463,6 +473,7 @@
     });
     c.on('open', function () {
       conn = c;
+      pending = [];
       linkLost = false;
       lastHeard = performance.now();
       c.send({ t: 'hello', name: myName() });
@@ -489,6 +500,10 @@
         refreshOverlay();
       } else if (m.t === 'state') {
         view = m.s;
+        if (me === 1) {
+          pending = pending.filter(function (q) { return q.n > (m.k || 0); });
+          for (const q of pending) { predict(view, q.a); }
+        }
         if ($('game').hidden) { show('game'); }
         refreshOverlay();
       }
@@ -907,6 +922,26 @@
   // *-*-*-*-*-*-*-*-*-*-*-* drawing: effects *-*-*-*-*-*-*-*-*-*-*-*
   const fx = { parts: [], floats: [], flash: null, trail: null, seenLock: 0, seenClear: 0, seenSwap: 0, seenLevel: 1, seenOver: false };
 
+  // the partner's piece is heard too, a little lower and softer than your own.
+  let heard = null;
+  let heardN = 0;
+  function hearPartner(s) {
+    if (me < 0) { return; }
+    const pl = s.players[1 - me];
+    const p = pl.piece;
+    const sig = p ? { locks: pl.locks, kind: p.kind, x: p.x, cells: p.cells.join('|') } : null;
+    if (sig && heard && sig.locks === heard.locks && sig.kind === heard.kind && !s.over) {
+      if (sig.cells !== heard.cells) {
+        SFX.turn2();
+        heardN++;
+      } else if (sig.x !== heard.x) {
+        SFX.move2();
+        heardN++;
+      }
+    }
+    heard = sig;
+  }
+
   function watchEvents(s, c) {
     if (s.lockN < fx.seenLock || s.clearN < fx.seenClear) {
       fx.seenLock = 0;
@@ -1129,6 +1164,7 @@
     drawSky(now);
     if ($('game').hidden || !view) { return; }
     watchEvents(view, cell);
+    hearPartner(view);
     drawBoard($('board').getContext('2d'), view, cell, me >= 0 ? me : null, true, dt);
     const showSet = role === 'host';
     if ($('bot-set').hidden === showSet || $('bot-skill').hidden === botOn) {
@@ -1346,8 +1382,48 @@
     if (role === 'host') {
       if (!paused && E.input(state, 0, a)) { dirty = true; }
     } else if (conn && conn.open) {
-      conn.send({ t: 'in', a: a });
+      moveN++;
+      conn.send({ t: 'in', a: a, n: moveN });
+      if (a === 'L' || a === 'R' || a === 'rot' || a === 'D') {
+        pending.push({ n: moveN, a: a });
+        if (pending.length > 40) { pending.shift(); }
+        predict(view, a);
+      }
     }
+  }
+
+  // the guest moves its own piece on its own screen right away; the host's next snapshot confirms or corrects it.
+  function predict(v, a) {
+    const p = v.players[1].piece;
+    if (!p || v.over || v.clearing || !v.started) { return; }
+    if (a === 'D') {
+      if (!E.hit(v, 1, p.cells, p.x, p.y + 1)) { p.y++; }
+      return;
+    }
+    E.input(v, 1, a);
+  }
+
+  // *-*-*-*-*-*-*-*-*-*-*-* held keys: our own repeat, so down does not wait for the keyboard's slow one *-*-*-*-*-*-*-*-*-*-*-*
+  const held = {};
+  function holdStart(a) {
+    if (held[a]) { return; }
+    held[a] = {};
+    act(a);
+    if (a !== 'L' && a !== 'R' && a !== 'D') { return; }
+    const h = held[a];
+    h.wait = setTimeout(function () {
+      h.rep = setInterval(function () { act(a); }, a === 'D' ? 30 : 45);
+    }, a === 'D' ? 70 : 140);
+  }
+  function holdStop(a) {
+    const h = held[a];
+    if (!h) { return; }
+    clearTimeout(h.wait);
+    clearInterval(h.rep);
+    delete held[a];
+  }
+  function holdStopAll() {
+    for (const a of Object.keys(held)) { holdStop(a); }
   }
 
   const KEYS = {
@@ -1363,15 +1439,20 @@
     if (ev.target === $('chat-in')) { return; }
     if (ev.key === 'Enter' && !$('chat').hidden && !ev.repeat) {
       ev.preventDefault();
+      holdStopAll();
       $('chat-in').focus();
       return;
     }
     const a = KEYS[ev.key];
     if (!a) { return; }
     ev.preventDefault();
-    if (ev.repeat && (a === 'drop' || a === 'rot' || a === 'swap')) { return; }
-    act(a);
+    holdStart(a);
   });
+  window.addEventListener('keyup', function (ev) {
+    const a = KEYS[ev.key];
+    if (a) { holdStop(a); }
+  });
+  window.addEventListener('blur', holdStopAll);
   window.addEventListener('pointerdown', wake);
 
   document.querySelectorAll('#pad button').forEach(function (b) {
@@ -1390,8 +1471,8 @@
       act(a);
       if (a === 'L' || a === 'R' || a === 'D') {
         hold = setTimeout(function () {
-          rep = setInterval(function () { act(a); }, 60);
-        }, 180);
+          rep = setInterval(function () { act(a); }, a === 'D' ? 30 : 45);
+        }, a === 'D' ? 70 : 140);
       }
     });
     for (const n of ['pointerup', 'pointercancel', 'pointerleave']) { b.addEventListener(n, stop); }
@@ -1561,5 +1642,5 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, heard: function () { return heardN; } };
 })();
