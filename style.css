@@ -125,6 +125,9 @@ svg.pix { display: block; fill: currentColor; shape-rendering: crispEdges; }
 .roomline b { font-weight: 400; letter-spacing: .12em; }
 
 .scores { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; color: var(--mute); font-size: var(--t4); text-align: left; }
+.scores { --rows: 5; max-height: calc(var(--rows) * 1.5em + (var(--rows) - 1) * 4px); max-height: calc(var(--rows) * 1lh + (var(--rows) - 1) * 4px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--panel) transparent; scroll-snap-type: y proximity; }
+.scores li { scroll-snap-align: start; }
+.top .scores { --rows: 8; }
 .scores li { display: grid; grid-template-columns: 2ch 6ch minmax(0, 1fr); gap: 10px; }
 .scores li span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scores li.now { color: var(--ink); }

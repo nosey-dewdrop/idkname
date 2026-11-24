@@ -1090,7 +1090,7 @@
   }
 
   // the table to show: the shared list, the games other people are playing right now, and a live row for this game.
-  function tableRows(count, withLive) {
+  function tableRows(withLive) {
     const rows = (globalTop || loadLocal()).map(function (r) { return { score: r.score, who: r.who, now: false, live: false }; });
     const sameAsLast = function (r) { return lastRun && r.score === lastRun.score && r.who === lastRun.who; };
     const mineWho = view ? view.players[0].name + ' + ' + view.players[1].name : null;
@@ -1109,26 +1109,13 @@
     }
     rows.sort(function (a, b) { return b.score - a.score || (a.now ? 1 : -1); });
     for (let i = 0; i < rows.length; i++) { rows[i].rank = i + 1; }
-    // this game and up to three running games always stay in sight, even when they rank below the cut.
-    const keep = rows.filter(function (r) { return r.now; }).concat(rows.filter(function (r) { return r.live && !r.now; }).slice(0, 3));
-    const top = rows.slice(0, count);
-    for (const r of keep) {
-      if (top.indexOf(r) !== -1) { continue; }
-      for (let i = top.length - 1; i >= 0; i--) {
-        if (keep.indexOf(top[i]) === -1) {
-          top.splice(i, 1);
-          top.push(r);
-          break;
-        }
-      }
-    }
-    top.sort(function (a, b) { return a.rank - b.rank; });
-    return top;
+    return rows;
   }
   function fillScores(ol, rows) {
     const sig = rows.map(function (r) { return r.rank + '|' + r.score + '|' + r.who + '|' + r.now + '|' + r.live; }).join('\n');
     if (ol._sig === sig) { return; }
     ol._sig = sig;
+    const at = ol.scrollTop;
     ol.textContent = '';
     for (const r of rows) {
       const li = document.createElement('li');
@@ -1140,15 +1127,28 @@
       }
       ol.appendChild(li);
     }
+    ol.scrollTop = at;
+  }
+  // the list scrolls; the running game is brought back into sight unless the pointer is on the list.
+  function showMine(ol) {
+    const li = ol.querySelector('.now');
+    if (!li || ol.matches(':hover')) { return; }
+    const top = li.offsetTop - ol.offsetTop;
+    if (top < ol.scrollTop) {
+      ol.scrollTop = top;
+    } else if (top + li.offsetHeight > ol.scrollTop + ol.clientHeight) {
+      ol.scrollTop = top + li.offsetHeight - ol.clientHeight;
+    }
   }
   function renderScores() {
-    const home = tableRows(5, false);
+    const home = tableRows(false);
     $('home-best').hidden = home.length === 0;
     fillScores($('home-scores'), home);
-    fillScores($('ov-scores'), tableRows(5, false));
-    const side = tableRows(8, true);
+    fillScores($('ov-scores'), home);
+    const side = tableRows(true);
     $('side-top').hidden = side.length === 0;
     fillScores($('side-scores'), side);
+    if (view && !view.over) { showMine($('side-scores')); }
     // a small hop when the running game passes someone.
     const mine = side.find(function (r) { return r.now; });
     const rank = mine && view && !view.over ? mine.rank : 0;

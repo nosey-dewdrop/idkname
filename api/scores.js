@@ -7,7 +7,7 @@ const { list, put } = require('@vercel/blob');
 
 const PREFIX = 'scores/';
 const MAX_SCORE = 5000000;
-const TOP = 20;
+const TOP = 100;
 
 function clean(who) {
   return String(who || '').replace(/[^\p{L}\p{N} +_.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 30);
