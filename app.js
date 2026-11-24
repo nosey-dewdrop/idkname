@@ -7,7 +7,7 @@
   const Bot = window.Bot;
   const $ = function (id) { return document.getElementById(id); };
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const BOT_NAME = 'pix';
+  const BOT_NAME = 'bot';
   const STILL = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // *-*-*-*-*-*-*-*-*-*-*-* words *-*-*-*-*-*-*-*-*-*-*-*
@@ -43,8 +43,8 @@
       hEasy: 'easy. three block pieces join in, slower fall.',
       hNormal: 'normal. classic four block pieces.',
       hHard: 'hard. five block pieces join in, faster fall.',
-      hSkill: 'level. how well pix picks its spot.',
-      hSpeed: 'speed. how fast pix moves.',
+      hSkill: 'level. how well the bot picks its spot.',
+      hSpeed: 'speed. how fast the bot moves.',
       localWarn: 'this address only works on this computer. open the site from its network address so a phone can join.'
     },
     tr: {
@@ -78,8 +78,8 @@
       hEasy: 'kolay. üç bloklu parçalar da gelir, yavaş düşer.',
       hNormal: 'normal. klasik dört bloklu parçalar.',
       hHard: 'zor. beş bloklu parçalar da gelir, hızlı düşer.',
-      hSkill: 'seviye. pix yerini ne kadar iyi seçer.',
-      hSpeed: 'hız. pix ne kadar hızlı oynar.',
+      hSkill: 'seviye. bot yerini ne kadar iyi seçer.',
+      hSpeed: 'hız. bot ne kadar hızlı oynar.',
       localWarn: 'bu adres yalnız bu bilgisayarda çalışır. telefonun katılabilmesi için siteyi ağ adresinden aç.'
     }
   };

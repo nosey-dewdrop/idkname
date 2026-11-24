@@ -27,7 +27,8 @@ function fromName(pathname) {
     at: Number(m[2]),
     rows: Number(m[3]),
     together: Number(m[4]),
-    who: clean(Buffer.from(m[5], 'base64url').toString('utf8'))
+    // the computer player used to be called pix; old games show it as bot.
+    who: clean(Buffer.from(m[5], 'base64url').toString('utf8')).replace(/ \+ pix$/, ' + bot')
   };
 }
 

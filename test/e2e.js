@@ -39,7 +39,7 @@ function url(q) {
   await mid.keyboard.press('Space');
   await mid.waitForFunction(function () {
     const v = window.__idkname.view();
-    return v && v.players[1].name === 'pix' && v.board.some(function (r) { return r.indexOf(2) !== -1; });
+    return v && v.players[1].name === 'bot' && v.board.some(function (r) { return r.indexOf(2) !== -1; });
   }, null, { timeout: 30000 });
   console.log('computer partner placed a piece');
   for (let i = 0; i < 6; i++) {

@@ -333,18 +333,18 @@ const RULES = [
   {
     slug: 'computer', bag: 1,
     en: {
-      t: 'play with the computer', d: 'idkname has a computer partner called pix. Three skill levels, three speeds, and it takes the empty seat when a friend leaves.',
-      h: 'pix, the computer partner',
-      p: ['press play with the computer and pix takes the second colour on your board. it waits until you have placed your first piece.',
-        'pix has three levels, easy, normal and sharp. the level sets how well it picks a spot. it also has three speeds, calm, normal and fast, which set how quickly it moves.',
-        'pix can also step in from the waiting room, or take the seat when your friend drops out. there is no chat, voice or camera with pix.']
+      t: 'play with the computer', d: 'idkname has a computer partner, the bot. Three skill levels, three speeds, and it takes the empty seat when a friend leaves.',
+      h: 'the bot, your computer partner',
+      p: ['press play with the computer and the bot takes the second colour on your board. it waits until you have placed your first piece.',
+        'the bot has three levels, easy, normal and sharp. the level sets how well it picks a spot. it also has three speeds, calm, normal and fast, which set how quickly it moves.',
+        'the bot can also step in from the waiting room, or take the seat when your friend drops out. there is no chat, voice or camera with the bot.']
     },
     tr: {
-      t: 'bilgisayarla oyna', d: 'idkname oyununda pix adında bir bilgisayar oyuncu var. Üç beceri seviyesi, üç hız, arkadaş çıkınca boş yeri alır.',
-      h: 'pix, bilgisayar oyuncu',
-      p: ['bilgisayarla oyna düğmesine basınca pix tahtandaki ikinci rengi alır. sen ilk parçanı koyana kadar bekler.',
-        'pix\'in üç seviyesi var, kolay, normal ve usta. seviye yerini ne kadar iyi seçtiğini belirler. üç hızı da var, sakin, normal ve hızlı, bunlar ne kadar çabuk oynadığını belirler.',
-        'pix bekleme odasından da girebilir, arkadaşın düşünce yerini de alabilir. pix ile sohbet, ses ve kamera yoktur.']
+      t: 'bilgisayarla oyna', d: 'idkname oyununda bot adında bir bilgisayar oyuncu var. Üç beceri seviyesi, üç hız, arkadaş çıkınca boş yeri alır.',
+      h: 'bot, bilgisayar oyuncu',
+      p: ['bilgisayarla oyna düğmesine basınca bot tahtandaki ikinci rengi alır. sen ilk parçanı koyana kadar bekler.',
+        'bot\'un üç seviyesi var, kolay, normal ve usta. seviye yerini ne kadar iyi seçtiğini belirler. üç hızı da var, sakin, normal ve hızlı, bunlar ne kadar çabuk oynadığını belirler.',
+        'bot bekleme odasından da girebilir, arkadaşın düşünce yerini de alabilir. bot ile sohbet, ses ve kamera yoktur.']
     }
   },
   {
