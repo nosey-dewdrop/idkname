@@ -189,6 +189,11 @@ main { flex: 1; min-height: 0; display: flex; }
   background: var(--panel); padding: 16px 18px 18px; width: min(100%, 240px); display: grid; gap: 14px;
   box-shadow: inset 0 4px 0 rgba(255, 255, 255, .08), 0 6px 0 var(--panel-d);
 }
+.card { grid-template-columns: auto minmax(0, 1fr); }
+.card .who, .card .plines { grid-column: 1 / -1; }
+.face { justify-self: end; width: 80px; height: 88px; object-fit: cover; background: var(--board); box-shadow: 0 0 0 3px var(--panel-d); }
+.face.own { transform: scaleX(-1); }
+.face[hidden] { display: none; }
 .card.mine { box-shadow: inset 0 4px 0 rgba(255, 255, 255, .08), 0 6px 0 var(--accent); }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .who b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -215,8 +220,10 @@ kbd.space { width: 66px; }
   border: 0; outline: 0; padding: 7px 10px 9px; width: 100%; min-width: 0;
   box-shadow: inset 0 3px 0 rgba(0, 0, 0, .22);
 }
-.chatrow { display: flex; gap: 8px; align-items: stretch; }
-.tool.mic { height: auto; flex: none; padding: 0 10px 2px; }
+.chatrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.tool.mic { height: auto; flex: none; min-width: 0; padding: 0 8px 2px; }
+.chatrow input { flex: 1 1 100%; }
+.tool.mic { height: 30px; }
 .tool.mic.on { color: var(--on-accent); background: var(--accent); box-shadow: 0 3px 0 var(--accent-d); }
 .micnote { margin: 0; color: var(--mute); font-size: var(--t4); line-height: 1.1; }
 .micnote:empty { display: none; }
@@ -310,7 +317,16 @@ kbd.space { width: 66px; }
   .chatlog { display: none; }
   .chat input { font-size: var(--t4); padding: 8px 12px 10px; }
   .card { width: 100%; padding: 8px 10px 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; }
+  .card .who, .card .plines { grid-column: 1; }
+  .chatrow { flex-wrap: nowrap; }
+  .chatrow input { flex: 1 1 60px; }
+  .tool.mic { height: auto; }
   .card .next { grid-row: 1 / span 2; grid-column: 2; }
+  .card .face { grid-row: 2; grid-column: 3; width: 44px; height: 44px; }
+  /* with a camera on, the name takes the whole first line and the face sits beside the next piece. */
+  #game.faces .card { grid-template-columns: minmax(0, 1fr) auto auto; }
+  #game.faces .card .who { grid-column: 1 / -1; }
+  #game.faces .card .next { grid-row: 2; grid-column: 2; }
   .you { display: none; }
   .botset { grid-area: set; justify-content: flex-end; padding: 0; margin: 0; }
   .tool.help { margin-right: 0; }

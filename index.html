@@ -103,6 +103,7 @@
       <aside class="card p1" id="card-0">
         <p class="who"><span class="chip"></span><b class="pname"></b><em class="you" data-i18n="you" hidden>you</em></p>
         <canvas class="next" width="10" height="10"></canvas>
+        <video class="face" id="face-0" muted autoplay playsinline hidden></video>
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
       </aside>
       <div class="top" id="side-top" hidden>
@@ -131,6 +132,7 @@
       <aside class="card p2" id="card-1">
         <p class="who"><span class="chip"></span><b class="pname"></b><em class="you" data-i18n="you" hidden>you</em></p>
         <canvas class="next" width="10" height="10"></canvas>
+        <video class="face" id="face-1" muted autoplay playsinline hidden></video>
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
       </aside>
       <div class="botset" id="bot-set" hidden>
@@ -148,7 +150,7 @@
         <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
         <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
         <li id="legend-chat" hidden><span class="keys2"><kbd class="space">enter</kbd></span><span data-i18n="kChat">chat</span></li>
-        <li id="legend-mic" hidden><span class="keys2"><kbd>m</kbd></span><span data-i18n="kMic">voice</span></li>
+        <li id="legend-mic" hidden><span class="keys2"><kbd>m</kbd><kbd>v</kbd></span><span data-i18n="kMic">voice</span></li>
       </ul>
       <div class="chat" id="chat" hidden>
         <ol class="chatlog" id="chat-log" aria-live="polite"></ol>
@@ -156,6 +158,7 @@
         <div class="chatrow">
           <input id="chat-in" maxlength="60" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something" aria-label="chat">
           <button class="tool mic" id="mic" aria-pressed="false" data-i18n="mic">mic</button>
+          <button class="tool mic" id="cam" aria-pressed="false" data-i18n="cam">cam</button>
         </div>
         <audio id="voice" autoplay playsinline></audio>
       </div>

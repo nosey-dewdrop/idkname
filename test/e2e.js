@@ -197,6 +197,27 @@ function url(q) {
   await host.waitForFunction(function () { return !window.__idkname.voice().them; }, null, { timeout: 5000 });
   console.log('voice: host heard by guest, guest heard by host, mic off is silent');
 
+  // *-*-*-*-*-*-*-*-*-*-*-* camera: each face shows in its own player's card on both screens, and goes away when turned off *-*-*-*-*-*-*-*-*-*-*-*
+  const faceLive = function (id) {
+    const f = document.getElementById(id);
+    return !f.hidden && f.videoWidth > 0 && !f.paused;
+  };
+  await host.keyboard.press('v');
+  await host.waitForFunction(faceLive, 'face-0', { timeout: 15000 });
+  await guest.waitForFunction(faceLive, 'face-0', { timeout: 15000 });
+  assert.strictEqual(await guest.evaluate(function () { return document.getElementById('face-1').hidden; }), true, 'no face before the guest turns the camera on');
+  await guest.tap('#cam');
+  await host.waitForFunction(faceLive, 'face-1', { timeout: 15000 });
+  await guest.waitForFunction(faceLive, 'face-1', { timeout: 15000 });
+  await host.waitForTimeout(500);
+  await host.screenshot({ path: shots + '/5g-camera-desktop.png' });
+  await guest.screenshot({ path: shots + '/5g-camera-phone.png' });
+  await host.keyboard.press('v');
+  await guest.waitForFunction(function () { return document.getElementById('face-0').hidden; }, null, { timeout: 5000 });
+  await guest.tap('#cam');
+  await host.waitForFunction(function () { return document.getElementById('face-1').hidden; }, null, { timeout: 5000 });
+  console.log('camera: both faces on both screens, off hides them');
+
   // *-*-*-*-*-*-*-*-*-*-*-* live table: someone who is not in the room sees this running game on the home screen *-*-*-*-*-*-*-*-*-*-*-*
   const peekCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const peek = await peekCtx.newPage();

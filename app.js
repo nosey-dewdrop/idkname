@@ -35,7 +35,7 @@
       awayOther: '{name} is away', awayOtherDetail: 'paused. the game goes on when they are back.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores',
-      together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice', mic: 'mic', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
+      together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice, camera', mic: 'mic', cam: 'cam', camNo: 'no camera permission', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       diffEasy: 'difficulty: easy', diffNormal: 'difficulty: normal', diffHard: 'difficulty: hard',
@@ -70,7 +70,7 @@
       awayOther: '{name} uzakta', awayOtherDetail: 'duraklatıldı. geri gelince oyun devam eder.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar',
-      together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'sesli konuş', mic: 'mikrofon', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
+      together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'ses, kamera', mic: 'ses', cam: 'kamera', camNo: 'kamera izni yok', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       diffEasy: 'zorluk: kolay', diffNormal: 'zorluk: normal', diffHard: 'zorluk: zor',
@@ -150,8 +150,10 @@
   let muted = store('idkname-mute') === '1';
   function wake() {
     stillHere();
-    const v = $('voice');
-    if (v && v.srcObject && v.paused) { v.play().catch(function () { /* still blocked */ }); }
+    for (const id of ['voice', 'face-0', 'face-1']) {
+      const v = $(id);
+      if (v && v.srcObject && v.paused) { v.play().catch(function () { /* still blocked */ }); }
+    }
     if (ac || muted) { return; }
     const A = window.AudioContext || window.webkitAudioContext;
     if (A) { ac = new A(); }
@@ -726,7 +728,7 @@
     if (role === 'host') { hostSay(0, text); } else { conn.send({ t: 'chat', m: text }); }
   }
 
-  // *-*-*-*-*-*-*-*-*-*-*-* voice: the two players talk, sound goes straight between them *-*-*-*-*-*-*-*-*-*-*-*
+  // *-*-*-*-*-*-*-*-*-*-*-* voice and camera: the two players talk and see each other, straight between them *-*-*-*-*-*-*-*-*-*-*-*
   // the room link only carries the handshake (t: 'rtc'). the host never yields on a clash, the guest does.
   const RTC_CFG = { iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }] };
   let pc = null;
@@ -735,6 +737,12 @@
   let micOn = false;
   let micBusy = false;
   let themMic = false;
+  let camTrack = null;
+  let camSender = null;
+  let camOn = false;
+  let camBusy = false;
+  let themCam = false;
+  let themFace = null;
   let makingOffer = false;
   let ignoreOffer = false;
   let voiceNote = '';
@@ -764,8 +772,13 @@
       }
     };
     mine.ontrack = function (e) {
+      if (e.track.kind === 'video') {
+        themFace = new MediaStream([e.track]);
+        renderVoice();
+        return;
+      }
       const a = $('voice');
-      a.srcObject = e.streams[0] || new MediaStream([e.track]);
+      a.srcObject = new MediaStream([e.track]);
       a.play().catch(function () { /* waits for the next touch, see wake */ });
     };
     mine.onconnectionstatechange = function () {
@@ -779,8 +792,9 @@
     return mine;
   }
   async function voiceSignal(m) {
-    if (m.on !== undefined) {
-      themMic = !!m.on;
+    if (m.on !== undefined || m.cam !== undefined) {
+      if (m.on !== undefined) { themMic = !!m.on; }
+      if (m.cam !== undefined) { themCam = !!m.cam; }
       renderVoice();
       return;
     }
@@ -841,12 +855,53 @@
     micBusy = false;
     renderVoice();
   }
+  async function camToggle() {
+    if (camBusy || $('chat').hidden) { return; }
+    if (camOn) {
+      camOn = false;
+      if (camTrack) { camTrack.stop(); }
+      camTrack = null;
+      if (camSender) { camSender.replaceTrack(null).catch(function () { /* link already closed */ }); }
+      voiceSend({ cam: false });
+      renderVoice();
+      return;
+    }
+    camBusy = true;
+    voiceNote = '';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 240 }, height: { ideal: 240 }, frameRate: { ideal: 15 }, facingMode: 'user' } });
+      const track = stream.getVideoTracks()[0];
+      if ($('chat').hidden) {
+        track.stop();
+      } else {
+        const p = voicePc();
+        if (camSender) {
+          await camSender.replaceTrack(track);
+        } else {
+          camSender = p.addTrack(track, stream);
+        }
+        camTrack = track;
+        camOn = true;
+        voiceSend({ cam: true });
+      }
+    } catch (e) {
+      voiceNote = 'camNo';
+    }
+    camBusy = false;
+    renderVoice();
+  }
   function voiceStop() {
     if (micTrack) { micTrack.stop(); }
+    if (camTrack) { camTrack.stop(); }
     micTrack = null;
     micSender = null;
     micOn = false;
     themMic = false;
+    camTrack = null;
+    camSender = null;
+    camOn = false;
+    themCam = false;
+    themFace = null;
     voiceNote = '';
     if (pc) {
       const old = pc;
@@ -859,6 +914,26 @@
   function renderVoice() {
     $('mic').classList.toggle('on', micOn);
     $('mic').setAttribute('aria-pressed', micOn ? 'true' : 'false');
+    $('cam').classList.toggle('on', camOn);
+    $('cam').setAttribute('aria-pressed', camOn ? 'true' : 'false');
+    // each face sits in its player's card: your own mirrored, your partner's as sent.
+    for (let i = 0; i < 2; i++) {
+      const f = $('face-' + i);
+      const own = i === me;
+      const src = me < 0 ? null : own ? (camOn && camTrack ? camTrack : null) : (themCam && themFace ? themFace.getVideoTracks()[0] : null);
+      if (f._track !== src) {
+        f._track = src;
+        f.srcObject = src ? new MediaStream([src]) : null;
+        f.hidden = !src;
+        f.classList.toggle('own', own);
+        if (src) { f.play().catch(function () { /* waits for the next touch */ }); }
+      }
+    }
+    const faces = !$('face-0').hidden || !$('face-1').hidden;
+    if ($('game').classList.contains('faces') !== faces) {
+      $('game').classList.toggle('faces', faces);
+      fitBoard();
+    }
     const other = view && me >= 0 ? view.players[1 - me].name : '';
     $('mic-note').textContent = voiceNote ? t(voiceNote) : themMic ? t('themMic', { name: other }) : '';
   }
@@ -1714,6 +1789,10 @@
       micToggle();
       return;
     }
+    if ((ev.key === 'v' || ev.key === 'V') && !$('chat').hidden && !ev.repeat) {
+      camToggle();
+      return;
+    }
     const a = KEYS[ev.key];
     if (!a) { return; }
     ev.preventDefault();
@@ -1779,6 +1858,10 @@
     refreshOverlay();
     sendLobby();
     sendState(true);
+  });
+  $('cam').addEventListener('click', function () {
+    camToggle();
+    $('cam').blur();
   });
   $('mic').addEventListener('click', function () {
     micToggle();
@@ -1924,5 +2007,5 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; }, voice: function () { return { mic: micOn, them: themMic, state: pc ? pc.connectionState : 'none', pc: pc }; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; }, voice: function () { return { mic: micOn, them: themMic, cam: camOn, themCam: themCam, state: pc ? pc.connectionState : 'none', pc: pc }; } };
 })();
