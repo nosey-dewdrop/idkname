@@ -136,6 +136,8 @@ svg.pix { display: block; fill: currentColor; shape-rendering: crispEdges; }
 .top { width: min(100%, 240px); padding: 0 18px; }
 .top .scores li { grid-template-columns: 2ch 5ch minmax(0, 1fr); gap: 8px; }
 .home-menu .status:empty { display: none; }
+.quiet { display: inline-block; margin-top: 18px; color: var(--mute); font-size: var(--t4); text-decoration: none; }
+.quiet:hover { color: var(--ink); }
 
 /* *-*-*-*-*-*-*-*-*-*-*-* the cabinet frame around a board *-*-*-*-*-*-*-*-*-*-*-* */
 .frame {

@@ -3,7 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>idkname</title>
+<title>idkname | a falling block game for two players on one board</title>
+<link rel="canonical" href="https://idkname.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="idkname">
+<meta property="og:title" content="idkname, a falling block game for two on one board">
+<meta property="og:description" content="Open a room, your friend scans the QR, you stack together. Chat, voice and camera inside the game. Or play with the computer.">
+<meta property="og:url" content="https://idkname.vercel.app/">
+<meta property="og:image" content="https://idkname.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "idkname", "url": "https://idkname.vercel.app/", "description": "A falling block game for two on one board. Open a room, your friend scans the QR, you stack together. Or play with the computer.", "genre": "Puzzle", "playMode": "CoOp", "numberOfPlayers": {"@type": "QuantitativeValue", "minValue": 1, "maxValue": 2}, "gamePlatform": "Web browser", "applicationCategory": "Game", "operatingSystem": "Any", "inLanguage": ["en", "tr"], "image": "https://idkname.vercel.app/og.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}</script>
 <meta name="description" content="A falling block game for two on one board. Open a room, your friend scans the QR, you stack together. Or play with the computer.">
 <link rel="preload" href="vendor/jersey-15-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
@@ -60,6 +72,7 @@
         <p class="label" data-i18n="top">top scores</p>
         <ol class="scores" id="home-scores"></ol>
       </div>
+      <a class="quiet" id="guide-link" href="/guide/" data-i18n="howTo">how to play</a>
     </div>
     <div class="home-demo" aria-hidden="true">
       <div class="frame"><canvas id="demo"></canvas></div>

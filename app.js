@@ -34,7 +34,7 @@
       awayYou: 'are you there?', awayYouDetail: 'paused. press any key to keep playing.',
       awayOther: '{name} is away', awayOtherDetail: 'paused. the game goes on when they are back.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
-      top: 'top scores',
+      top: 'top scores', howTo: 'how to play',
       together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice, camera', mic: 'mic', cam: 'cam', camNo: 'no camera permission', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
@@ -69,7 +69,7 @@
       awayYou: 'orada mısın?', awayYouDetail: 'duraklatıldı. devam etmek için bir tuşa bas.',
       awayOther: '{name} uzakta', awayOtherDetail: 'duraklatıldı. geri gelince oyun devam eder.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
-      top: 'en iyi skorlar',
+      top: 'en iyi skorlar', howTo: 'nasıl oynanır',
       together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'ses, kamera', mic: 'ses', cam: 'kamera', camNo: 'kamera izni yok', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
@@ -107,6 +107,7 @@
       el.textContent = t(el.dataset.i18n);
     });
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
+    $('guide-link').href = lang === 'en' ? '/guide/' : '/tr/guide/';
     $('chat-in').placeholder = t('chatPh');
     renderVoice();
     $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
