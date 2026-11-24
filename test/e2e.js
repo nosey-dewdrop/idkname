@@ -13,7 +13,7 @@ function url(q) {
 }
 
 (async function () {
-  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  const browser = await chromium.launch(Object.assign({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }, process.env.CHROME ? { executablePath: process.env.CHROME } : {}));
   const hostCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const guestCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
   const host = await hostCtx.newPage();
@@ -162,6 +162,40 @@ function url(q) {
   await host.screenshot({ path: shots + '/5a-chat-desktop.png' });
   await guest.screenshot({ path: shots + '/5a-chat-phone.png' });
   console.log('chat went both ways, bubbles on both boards');
+
+  // *-*-*-*-*-*-*-*-*-*-*-* voice: one mic on, the other hears; both on, both hear; off again goes quiet *-*-*-*-*-*-*-*-*-*-*-*
+  // the browsers run with a fake microphone that beeps, so heard sound can be measured as energy arriving.
+  const heardEnergy = function () {
+    const pc = window.__idkname.voice().pc;
+    if (!pc) { return 0; }
+    return pc.getStats().then(function (st) {
+      let e = 0;
+      st.forEach(function (r) { if (r.type === 'inbound-rtp' && r.kind === 'audio') { e += r.totalAudioEnergy || 0; } });
+      return e;
+    });
+  };
+  assert.strictEqual(await host.evaluate(function () { return document.getElementById('legend-mic').hidden; }), false, 'voice key is listed');
+  await host.keyboard.press('m');
+  await guest.waitForFunction(function () { const v = window.__idkname.voice(); return v.them && v.state === 'connected'; }, null, { timeout: 15000 });
+  await guest.waitForFunction(heardEnergy, null, { timeout: 15000 });
+  assert.strictEqual(await guest.evaluate(function () { return document.getElementById('mic-note').textContent; }), 'damla is on voice');
+  assert.strictEqual(await guest.evaluate(function () { return document.getElementById('voice').paused; }), false, 'the partner voice is playing');
+  assert.strictEqual(await host.evaluate(heardEnergy), 0, 'nothing comes back while the guest mic is off');
+  await guest.tap('#mic');
+  await host.waitForFunction(function () { return window.__idkname.voice().them; }, null, { timeout: 15000 });
+  await host.waitForFunction(heardEnergy, null, { timeout: 15000 });
+  await host.screenshot({ path: shots + '/5f-voice-desktop.png' });
+  await guest.screenshot({ path: shots + '/5f-voice-phone.png' });
+  await host.keyboard.press('m');
+  await guest.waitForFunction(function () { return !window.__idkname.voice().them; }, null, { timeout: 5000 });
+  await guest.waitForTimeout(600);
+  const e1 = await guest.evaluate(heardEnergy);
+  await guest.waitForTimeout(1500);
+  const e2 = await guest.evaluate(heardEnergy);
+  assert.ok(e2 - e1 < 1e-6, 'mic off must send no sound, energy grew by ' + (e2 - e1));
+  await guest.tap('#mic');
+  await host.waitForFunction(function () { return !window.__idkname.voice().them; }, null, { timeout: 5000 });
+  console.log('voice: host heard by guest, guest heard by host, mic off is silent');
 
   // *-*-*-*-*-*-*-*-*-*-*-* live table: someone who is not in the room sees this running game on the home screen *-*-*-*-*-*-*-*-*-*-*-*
   const peekCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });

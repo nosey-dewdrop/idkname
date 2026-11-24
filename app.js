@@ -35,7 +35,7 @@
       awayOther: '{name} is away', awayOtherDetail: 'paused. the game goes on when they are back.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores',
-      together: 'together', kSwap: 'swap next', kChat: 'chat', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
+      together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice', mic: 'mic', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
       diffEasy: 'difficulty: easy', diffNormal: 'difficulty: normal', diffHard: 'difficulty: hard',
@@ -70,7 +70,7 @@
       awayOther: '{name} uzakta', awayOtherDetail: 'duraklatıldı. geri gelince oyun devam eder.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar',
-      together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
+      together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'sesli konuş', mic: 'mikrofon', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
       diffEasy: 'zorluk: kolay', diffNormal: 'zorluk: normal', diffHard: 'zorluk: zor',
@@ -108,6 +108,7 @@
     });
     $('lang').textContent = lang === 'en' ? 'TR' : 'EN';
     $('chat-in').placeholder = t('chatPh');
+    renderVoice();
     $('bot-speed').textContent = t(BOT_SPEED_WORD[botSpeed]);
     $('bot-skill').textContent = t(BOT_SKILL_WORD[botSkill]);
     $('diff').textContent = t(DIFF_WORD[gameDiff]);
@@ -149,6 +150,8 @@
   let muted = store('idkname-mute') === '1';
   function wake() {
     stillHere();
+    const v = $('voice');
+    if (v && v.srcObject && v.paused) { v.play().catch(function () { /* still blocked */ }); }
     if (ac || muted) { return; }
     const A = window.AudioContext || window.webkitAudioContext;
     if (A) { ac = new A(); }
@@ -350,6 +353,10 @@
         return;
       }
       if (c !== conn) { return; }
+      if (m.t === 'rtc') {
+        voiceSignal(m);
+        return;
+      }
       if (m.t === 'in' || m.t === 'chat' || m.t === 'here') { markHere(1); }
       if (m.t === 'chat') {
         hostSay(1, m.m);
@@ -542,6 +549,8 @@
         showReact(m.e);
       } else if (m.t === 'chat') {
         say(m.p, m.m);
+      } else if (m.t === 'rtc') {
+        voiceSignal(m);
       } else if (m.t === 'lobby') {
         names = m.names;
         watchCount = m.w || 0;
@@ -715,6 +724,143 @@
     lastSaid = now;
     box.value = '';
     if (role === 'host') { hostSay(0, text); } else { conn.send({ t: 'chat', m: text }); }
+  }
+
+  // *-*-*-*-*-*-*-*-*-*-*-* voice: the two players talk, sound goes straight between them *-*-*-*-*-*-*-*-*-*-*-*
+  // the room link only carries the handshake (t: 'rtc'). the host never yields on a clash, the guest does.
+  const RTC_CFG = { iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }] };
+  let pc = null;
+  let micTrack = null;
+  let micSender = null;
+  let micOn = false;
+  let micBusy = false;
+  let themMic = false;
+  let makingOffer = false;
+  let ignoreOffer = false;
+  let voiceNote = '';
+
+  function voiceSend(o) {
+    if (conn && conn.open) {
+      o.t = 'rtc';
+      conn.send(o);
+    }
+  }
+  function voicePc() {
+    if (pc) { return pc; }
+    const mine = new RTCPeerConnection(RTC_CFG);
+    pc = mine;
+    mine.onicecandidate = function (e) {
+      if (e.candidate) { voiceSend({ c: e.candidate.toJSON() }); }
+    };
+    mine.onnegotiationneeded = async function () {
+      try {
+        makingOffer = true;
+        await mine.setLocalDescription();
+        voiceSend({ d: mine.localDescription.toJSON() });
+      } catch (e) {
+        /* the next change asks again */
+      } finally {
+        makingOffer = false;
+      }
+    };
+    mine.ontrack = function (e) {
+      const a = $('voice');
+      a.srcObject = e.streams[0] || new MediaStream([e.track]);
+      a.play().catch(function () { /* waits for the next touch, see wake */ });
+    };
+    mine.onconnectionstatechange = function () {
+      if (mine !== pc) { return; }
+      if (mine.connectionState === 'failed') {
+        voiceStop();
+        voiceNote = 'voiceFail';
+      }
+      renderVoice();
+    };
+    return mine;
+  }
+  async function voiceSignal(m) {
+    if (m.on !== undefined) {
+      themMic = !!m.on;
+      renderVoice();
+      return;
+    }
+    const p = voicePc();
+    try {
+      if (m.d) {
+        const clash = m.d.type === 'offer' && (makingOffer || p.signalingState !== 'stable');
+        ignoreOffer = role === 'host' && clash;
+        if (ignoreOffer) { return; }
+        await p.setRemoteDescription(m.d);
+        if (m.d.type === 'offer') {
+          await p.setLocalDescription();
+          voiceSend({ d: p.localDescription.toJSON() });
+        }
+      } else if (m.c) {
+        try {
+          await p.addIceCandidate(m.c);
+        } catch (e) {
+          if (!ignoreOffer) { throw e; }
+        }
+      }
+    } catch (e) {
+      /* a stale handshake message: the next one settles it */
+    }
+  }
+  async function micToggle() {
+    if (micBusy || $('chat').hidden) { return; }
+    if (micOn) {
+      micOn = false;
+      if (micTrack) { micTrack.stop(); }
+      micTrack = null;
+      if (micSender) { micSender.replaceTrack(null).catch(function () { /* link already closed */ }); }
+      voiceSend({ on: false });
+      renderVoice();
+      return;
+    }
+    micBusy = true;
+    voiceNote = '';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const track = stream.getAudioTracks()[0];
+      if ($('chat').hidden) {
+        track.stop();
+      } else {
+        const p = voicePc();
+        if (micSender) {
+          await micSender.replaceTrack(track);
+        } else {
+          micSender = p.addTrack(track, stream);
+        }
+        micTrack = track;
+        micOn = true;
+        voiceSend({ on: true });
+      }
+    } catch (e) {
+      voiceNote = 'micNo';
+    }
+    micBusy = false;
+    renderVoice();
+  }
+  function voiceStop() {
+    if (micTrack) { micTrack.stop(); }
+    micTrack = null;
+    micSender = null;
+    micOn = false;
+    themMic = false;
+    voiceNote = '';
+    if (pc) {
+      const old = pc;
+      pc = null;
+      try { old.close(); } catch (e) { /* already closed */ }
+    }
+    $('voice').srcObject = null;
+    renderVoice();
+  }
+  function renderVoice() {
+    $('mic').classList.toggle('on', micOn);
+    $('mic').setAttribute('aria-pressed', micOn ? 'true' : 'false');
+    const other = view && me >= 0 ? view.players[1 - me].name : '';
+    $('mic-note').textContent = voiceNote ? t(voiceNote) : themMic ? t('themMic', { name: other }) : '';
   }
 
   // keeps each bubble by its speaker's piece while it falls: over the piece, tail on the face block.
@@ -1284,6 +1430,8 @@
     if ($('chat').hidden === talk) {
       $('chat').hidden = !talk;
       $('legend-chat').hidden = !talk;
+      $('legend-mic').hidden = !talk;
+      if (!talk) { voiceStop(); }
       $('game').classList.toggle('talk', talk);
       fitBoard();
     }
@@ -1562,6 +1710,10 @@
       $('chat-in').focus();
       return;
     }
+    if ((ev.key === 'm' || ev.key === 'M') && !$('chat').hidden && !ev.repeat) {
+      micToggle();
+      return;
+    }
     const a = KEYS[ev.key];
     if (!a) { return; }
     ev.preventDefault();
@@ -1627,6 +1779,10 @@
     refreshOverlay();
     sendLobby();
     sendState(true);
+  });
+  $('mic').addEventListener('click', function () {
+    micToggle();
+    $('mic').blur();
   });
   $('chat-in').addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') {
@@ -1768,5 +1924,5 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; } };
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; }, voice: function () { return { mic: micOn, them: themMic, state: pc ? pc.connectionState : 'none', pc: pc }; } };
 })();

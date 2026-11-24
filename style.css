@@ -215,6 +215,12 @@ kbd.space { width: 66px; }
   border: 0; outline: 0; padding: 7px 10px 9px; width: 100%; min-width: 0;
   box-shadow: inset 0 3px 0 rgba(0, 0, 0, .22);
 }
+.chatrow { display: flex; gap: 8px; align-items: stretch; }
+.tool.mic { height: auto; flex: none; padding: 0 10px 2px; }
+.tool.mic.on { color: var(--on-accent); background: var(--accent); box-shadow: 0 3px 0 var(--accent-d); }
+.micnote { margin: 0; color: var(--mute); font-size: var(--t4); line-height: 1.1; }
+.micnote:empty { display: none; }
+#voice { display: none; }
 .chat input:focus { box-shadow: inset 0 3px 0 rgba(0, 0, 0, .22), 0 3px 0 var(--accent); }
 .chat input::placeholder { color: var(--mute); opacity: .5; }
 .say {

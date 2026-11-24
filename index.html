@@ -148,10 +148,16 @@
         <li><span class="keys2"><kbd class="space" data-i18n="kSpace">space</kbd></span><span data-i18n="kDrop">drop</span></li>
         <li><span class="keys2"><kbd>c</kbd></span><span data-i18n="kSwap">swap next</span></li>
         <li id="legend-chat" hidden><span class="keys2"><kbd class="space">enter</kbd></span><span data-i18n="kChat">chat</span></li>
+        <li id="legend-mic" hidden><span class="keys2"><kbd>m</kbd></span><span data-i18n="kMic">voice</span></li>
       </ul>
       <div class="chat" id="chat" hidden>
         <ol class="chatlog" id="chat-log" aria-live="polite"></ol>
-        <input id="chat-in" maxlength="60" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something" aria-label="chat">
+        <p class="micnote" id="mic-note" role="status"></p>
+        <div class="chatrow">
+          <input id="chat-in" maxlength="60" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something" aria-label="chat">
+          <button class="tool mic" id="mic" aria-pressed="false" data-i18n="mic">mic</button>
+        </div>
+        <audio id="voice" autoplay playsinline></audio>
       </div>
     </div>
 
