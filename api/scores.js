@@ -1,5 +1,5 @@
 // *-*-*-*-*-*-*-*-*-*-*-* shared score table *-*-*-*-*-*-*-*-*-*-*-*
-// GET  /api/scores -> { top: [{ score, rows, together, who, at }] }
+// GET  /api/scores -> { top: [{ score, rows, together, who, at }] }, the best game of each pair
 // POST /api/scores { score, rows, together, who } -> { ok: true }
 // every finished game is one tiny file whose name carries the whole record, so nothing is ever read-modify-written.
 
@@ -35,9 +35,17 @@ module.exports = async function (req, res) {
   try {
     if (req.method === 'GET') {
       const out = await list({ prefix: PREFIX, limit: 1000 });
+      // one line per pair, their best game, so one busy pair cannot fill the whole table.
+      const seen = {};
       const top = out.blobs.map(function (b) { return fromName(b.pathname); })
         .filter(Boolean)
         .sort(function (a, b) { return b.score - a.score || a.at - b.at; })
+        .filter(function (r) {
+          const key = r.who.toLowerCase();
+          if (seen[key]) { return false; }
+          seen[key] = true;
+          return true;
+        })
         .slice(0, TOP);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ top: top });
