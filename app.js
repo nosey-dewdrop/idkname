@@ -834,35 +834,78 @@
     renderScores();
   }
 
-  // the table to show: the shared list plus, while a game runs, a live row for that game.
+  // *-*-*-*-*-*-*-*-*-*-*-* games running right now, on every screen *-*-*-*-*-*-*-*-*-*-*-*
+  // the host tells the relay its score every few seconds; everyone reads the list of running games.
+  let liveGames = [];
+  let liveSent = null;
+  const liveId = Math.random().toString(36).slice(2, 12).padEnd(8, '0');
+  function livePulse() {
+    const running = role === 'host' && view && !view.over && view.score > 0;
+    let opt = { cache: 'no-store' };
+    if (running) {
+      liveSent = { id: liveId, who: view.players[0].name + ' + ' + view.players[1].name, score: view.score, rows: view.lines };
+      opt = { method: 'POST', body: JSON.stringify(liveSent) };
+    } else if (liveSent) {
+      liveSent.over = true;
+      opt = { method: 'POST', body: JSON.stringify(liveSent) };
+      liveSent = null;
+    } else if (document.hidden) {
+      return;
+    }
+    fetch(Net.LIVE + (navigator.webdriver ? '?test=1' : ''), opt).then(function (r) {
+      return r.ok ? r.json() : Promise.reject();
+    }).then(function (j) {
+      if (Array.isArray(j.live)) {
+        liveGames = j.live;
+        renderScores();
+      }
+    }).catch(function () { /* relay unreachable: the table shows finished games only */ });
+  }
+
+  // the table to show: the shared list, the games other people are playing right now, and a live row for this game.
   function tableRows(count, withLive) {
-    const rows = (globalTop || loadLocal()).map(function (r) { return { score: r.score, who: r.who, now: false }; });
+    const rows = (globalTop || loadLocal()).map(function (r) { return { score: r.score, who: r.who, now: false, live: false }; });
     const sameAsLast = function (r) { return lastRun && r.score === lastRun.score && r.who === lastRun.who; };
+    const mineWho = view ? view.players[0].name + ' + ' + view.players[1].name : null;
+    for (const g of liveGames) {
+      if (g.who !== mineWho) { rows.push({ score: g.score, who: g.who, now: false, live: true }); }
+    }
     if (withLive && view && !view.over && view.score > 0) {
-      rows.push({ score: view.score, who: view.players[0].name + ' + ' + view.players[1].name, now: true });
+      rows.push({ score: view.score, who: mineWho, now: true, live: true });
     } else if (lastRun) {
       const hit = rows.find(sameAsLast);
       if (hit) {
         hit.now = true;
       } else {
-        rows.push({ score: lastRun.score, who: lastRun.who, now: true });
+        rows.push({ score: lastRun.score, who: lastRun.who, now: true, live: false });
       }
     }
     rows.sort(function (a, b) { return b.score - a.score || (a.now ? 1 : -1); });
     for (let i = 0; i < rows.length; i++) { rows[i].rank = i + 1; }
+    // this game and up to three running games always stay in sight, even when they rank below the cut.
+    const keep = rows.filter(function (r) { return r.now; }).concat(rows.filter(function (r) { return r.live && !r.now; }).slice(0, 3));
     const top = rows.slice(0, count);
-    const mine = rows.find(function (r) { return r.now; });
-    if (mine && top.indexOf(mine) === -1 && top.length > 0) { top[top.length - 1] = mine; }
+    for (const r of keep) {
+      if (top.indexOf(r) !== -1) { continue; }
+      for (let i = top.length - 1; i >= 0; i--) {
+        if (keep.indexOf(top[i]) === -1) {
+          top.splice(i, 1);
+          top.push(r);
+          break;
+        }
+      }
+    }
+    top.sort(function (a, b) { return a.rank - b.rank; });
     return top;
   }
   function fillScores(ol, rows) {
-    const sig = rows.map(function (r) { return r.rank + '|' + r.score + '|' + r.who + '|' + r.now; }).join('\n');
+    const sig = rows.map(function (r) { return r.rank + '|' + r.score + '|' + r.who + '|' + r.now + '|' + r.live; }).join('\n');
     if (ol._sig === sig) { return; }
     ol._sig = sig;
     ol.textContent = '';
     for (const r of rows) {
       const li = document.createElement('li');
-      if (r.now) { li.className = 'now'; }
+      li.className = (r.now ? 'now' : '') + (r.live ? ' live' : '');
       for (const v of [r.rank, r.score, r.who]) {
         const sp = document.createElement('span');
         sp.textContent = v;
@@ -1719,6 +1762,8 @@
   setInterval(function () {
     if (!document.hidden) { fetchScores(); }
   }, 20000);
+  livePulse();
+  setInterval(livePulse, 4000);
   show('home');
   dropLogoDot();
   requestAnimationFrame(frame);

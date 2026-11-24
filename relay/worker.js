@@ -9,6 +9,50 @@ import { DurableObject } from 'cloudflare:workers';
 
 const ORIGIN_OK = /^(https:\/\/idkname\.vercel\.app|https:\/\/idkname-[a-z0-9-]+\.vercel\.app|http:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?)$/;
 const HOST_GRACE_MS = 60000;
+const LIVE_MS = 15000;
+const LIVE_MAX = 200;
+
+// *-*-*-*-*-*-*-*-*-*-*-* games running right now *-*-*-*-*-*-*-*-*-*-*-*
+// every host posts its score every few seconds; an entry that stops arriving drops out after LIVE_MS.
+//   POST /live { id, who, score, rows, over }  -> { live: [{ who, score, rows }] }
+//   GET  /live                                 -> { live: [...] }
+// test=1 keeps automated browsers in their own list, away from real players.
+export class Lobby extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.games = new Map();
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const test = url.searchParams.get('test') === '1';
+    const now = Date.now();
+    for (const [k, g] of this.games) {
+      if (now - g.seen > LIVE_MS) { this.games.delete(k); }
+    }
+    if (request.method === 'POST') {
+      let b = null;
+      try { b = JSON.parse(await request.text()); } catch (e) { b = null; }
+      const id = b && typeof b.id === 'string' && /^[a-z0-9]{8,32}$/.test(b.id) ? b.id : '';
+      if (!id) { return Response.json({ live: [] }, { status: 400 }); }
+      const who = String(b.who || '').replace(/[^\p{L}\p{N} +_.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+      const score = Math.floor(Number(b.score));
+      const rows = Math.floor(Number(b.rows));
+      const sane = score > 0 && score <= 5000000 && rows >= 0 && rows <= 5000 && who.length >= 3 && who.indexOf(' + ') > 0;
+      if (b.over || !sane) {
+        this.games.delete(id);
+      } else if (this.games.has(id) || this.games.size < LIVE_MAX) {
+        this.games.set(id, { who: who, score: score, rows: rows, test: test, seen: now });
+      }
+    }
+    const live = [];
+    for (const g of this.games.values()) {
+      if (g.test === test) { live.push({ who: g.who, score: g.score, rows: g.rows }); }
+    }
+    live.sort(function (a, b) { return b.score - a.score; });
+    return Response.json({ live: live.slice(0, 50) });
+  }
+}
 
 export class Room extends DurableObject {
   host() {
@@ -123,10 +167,24 @@ export class Room extends DurableObject {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin') || '';
+    if (url.pathname === '/live') {
+      if (!ORIGIN_OK.test(origin)) { return new Response('forbidden', { status: 403 }); }
+      const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Cache-Control': 'no-store' };
+      if (request.method === 'OPTIONS') {
+        cors['Access-Control-Allow-Methods'] = 'GET, POST';
+        cors['Access-Control-Allow-Headers'] = 'Content-Type';
+        return new Response(null, { status: 204, headers: cors });
+      }
+      if (request.method !== 'GET' && request.method !== 'POST') { return new Response('no', { status: 405, headers: cors }); }
+      const r = await env.LOBBY.get(env.LOBBY.idFromName('all')).fetch(request);
+      const out = new Response(r.body, r);
+      for (const k in cors) { out.headers.set(k, cors[k]); }
+      return out;
+    }
     const m = url.pathname.match(/^\/r\/([A-Z]{4})$/);
     if (!m) { return new Response('idkname relay', { status: 200 }); }
     if (request.headers.get('Upgrade') !== 'websocket') { return new Response('websocket only', { status: 426 }); }
-    const origin = request.headers.get('Origin') || '';
     if (!ORIGIN_OK.test(origin)) { return new Response('forbidden', { status: 403 }); }
     return env.ROOM.get(env.ROOM.idFromName(m[1])).fetch(request);
   }

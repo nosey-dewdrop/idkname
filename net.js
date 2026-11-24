@@ -2,7 +2,10 @@
 // so it works the same on home wifi, mobile data and school networks.
 (function (root) {
   'use strict';
-  const BASE = 'wss://idkname-relay.damummyphus.workers.dev/r/';
+  // on a developer machine ?relay=host:port points the page at a relay running there.
+  const LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.)/.test(location.hostname) ? new URLSearchParams(location.search).get('relay') : null;
+  const BASE = LOCAL ? 'ws://' + LOCAL + '/r/' : 'wss://idkname-relay.damummyphus.workers.dev/r/';
+  const LIVE = LOCAL ? 'http://' + LOCAL + '/live' : 'https://idkname-relay.damummyphus.workers.dev/live';
   const OPEN_WAIT_MS = 8000;
 
   function emitter(o) {
@@ -151,5 +154,5 @@
     return room;
   }
 
-  root.Net = { host: host, join: join };
+  root.Net = { host: host, join: join, LIVE: LIVE };
 })(window);

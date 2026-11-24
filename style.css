@@ -129,6 +129,9 @@ svg.pix { display: block; fill: currentColor; shape-rendering: crispEdges; }
 .scores li span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scores li.now { color: var(--ink); }
 .scores li.bump { animation: bump .5s steps(5); }
+.scores li.live span:last-child::before { content: ""; display: inline-block; width: .5em; height: .5em; margin-right: 7px; background: var(--accent); animation: liveblink 1.2s steps(2, jump-none) infinite; }
+@keyframes liveblink { from { opacity: 1; } to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .scores li.live span:last-child::before { animation: none; } }
 @keyframes bump { 0% { transform: translateY(10px); } 40% { transform: translateY(-4px); } 100% { transform: none; } }
 .top { width: min(100%, 240px); padding: 0 18px; }
 .top .scores li { grid-template-columns: 2ch 5ch minmax(0, 1fr); gap: 8px; }

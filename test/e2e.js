@@ -6,6 +6,11 @@ const assert = require('assert');
 
 const base = process.argv[2];
 const shots = process.argv[3];
+// RELAY=host:port points every page at a relay running on this machine.
+function url(q) {
+  const parts = [process.env.RELAY ? 'relay=' + process.env.RELAY : '', q || ''].filter(Boolean);
+  return base + (parts.length ? '?' + parts.join('&') : '');
+}
 
 (async function () {
   const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
@@ -21,7 +26,7 @@ const shots = process.argv[3];
   const midCtx = await browser.newContext({ viewport: { width: 1000, height: 830 } });
   const mid = await midCtx.newPage();
   mid.on('pageerror', function (e) { errors.push('mid: ' + e.message); });
-  await mid.goto(base);
+  await mid.goto(url());
   await mid.waitForTimeout(6000);
   await mid.screenshot({ path: shots + '/0-home-1000.png' });
   await mid.fill('#name', 'damla');
@@ -60,7 +65,7 @@ const shots = process.argv[3];
   await mid.evaluate(function () { localStorage.removeItem('idkname-diff'); });
   await midCtx.close();
 
-  await host.goto(base);
+  await host.goto(url());
   await host.waitForTimeout(6000);
   await host.screenshot({ path: shots + '/1-home-desktop.png' });
   await host.fill('#name', 'damla');
@@ -70,7 +75,7 @@ const shots = process.argv[3];
   assert(/^[A-Z]{4}$/.test(code), 'room code: ' + code);
   console.log('room opened', code);
 
-  await guest.goto(base + '?room=' + code);
+  await guest.goto(url('room=' + code));
   await guest.waitForTimeout(800);
   await guest.screenshot({ path: shots + '/2-join-phone.png' });
   await guest.fill('#name', 'astra');
@@ -158,6 +163,27 @@ const shots = process.argv[3];
   await guest.screenshot({ path: shots + '/5a-chat-phone.png' });
   console.log('chat went both ways, bubbles on both boards');
 
+  // *-*-*-*-*-*-*-*-*-*-*-* live table: someone who is not in the room sees this running game on the home screen *-*-*-*-*-*-*-*-*-*-*-*
+  const peekCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const peek = await peekCtx.newPage();
+  peek.on('pageerror', function (e) { errors.push('peek: ' + e.message); });
+  await peek.goto(url());
+  const liveRow = function () {
+    return Array.from(document.querySelectorAll('#home-scores li.live')).filter(function (li) { return li.textContent.indexOf('damla + astra') !== -1; }).length;
+  };
+  await peek.waitForFunction(function () {
+    return Array.from(document.querySelectorAll('#home-scores li.live')).some(function (li) { return li.textContent.indexOf('damla + astra') !== -1; });
+  }, null, { timeout: 15000 });
+  assert.strictEqual(await peek.evaluate(liveRow), 1);
+  for (const pg of [host, guest]) {
+    await pg.waitForTimeout(4500);
+    assert.strictEqual(await pg.evaluate(function () {
+      return Array.from(document.querySelectorAll('#side-scores li')).filter(function (li) { return li.textContent.indexOf('damla + astra') !== -1; }).length;
+    }), 1, 'the running game shows once in its own table');
+  }
+  await peek.screenshot({ path: shots + '/5e-live-home.png' });
+  console.log('a running game shows live on a stranger\'s home screen, once in its own table');
+
   // *-*-*-*-*-*-*-*-*-*-*-* away: the guest touches nothing, the game pauses on both screens and goes on when they are back *-*-*-*-*-*-*-*-*-*-*-*
   await host.evaluate(function () { window.__idkname.setAway(1500); });
   for (let i = 0; i < 12 && (await host.evaluate(function () { return window.__idkname.away(); })) !== 1; i++) {
@@ -182,7 +208,7 @@ const shots = process.argv[3];
   const watchCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
   const watcher = await watchCtx.newPage();
   watcher.on('pageerror', function (e) { errors.push('watcher: ' + e.message); });
-  await watcher.goto(base + '?room=' + code);
+  await watcher.goto(url('room=' + code));
   await watcher.fill('#name', 'seyirci');
   await watcher.tap('#join');
   await watcher.waitForSelector('#game:not([hidden])', { timeout: 30000 });
@@ -219,6 +245,11 @@ const shots = process.argv[3];
   const gs = await guest.evaluate(function () { return window.__idkname.view().score; });
   assert.strictEqual(hs, gs, 'final score differs');
   console.log('game over on both, same score', hs);
+  await peek.waitForFunction(function () {
+    return !Array.from(document.querySelectorAll('#home-scores li.live')).some(function (li) { return li.textContent.indexOf('damla + astra') !== -1; });
+  }, null, { timeout: 25000 });
+  console.log('finished game left the live rows');
+  await peekCtx.close();
   await host.waitForTimeout(300);
   await host.screenshot({ path: shots + '/7-over-desktop.png' });
   await guest.screenshot({ path: shots + '/8-over-phone.png' });
@@ -232,7 +263,7 @@ const shots = process.argv[3];
   await host.screenshot({ path: shots + '/9-partner-left-desktop.png' });
   console.log('guest left, host paused');
   const guest2 = await guestCtx.newPage();
-  await guest2.goto(base + '?room=' + code);
+  await guest2.goto(url('room=' + code));
   await guest2.tap('#join');
   await guest2.waitForSelector('#game:not([hidden])', { timeout: 30000 });
   await host.waitForFunction(function () { return !window.__idkname.paused(); }, null, { timeout: 5000 });
