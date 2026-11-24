@@ -228,10 +228,10 @@ function url(q) {
   };
   await peek.waitForFunction(function () {
     return Array.from(document.querySelectorAll('#home-scores li.live')).some(function (li) { return li.textContent.indexOf('damla + astra') !== -1; });
-  }, null, { timeout: 15000 });
+  }, null, { timeout: 45000 });
   assert.strictEqual(await peek.evaluate(liveRow), 1);
   for (const pg of [host, guest]) {
-    await pg.waitForTimeout(4500);
+    await pg.waitForTimeout(1000);
     assert.strictEqual(await pg.evaluate(function () {
       return Array.from(document.querySelectorAll('#side-scores li')).filter(function (li) { return li.textContent.indexOf('damla + astra') !== -1; }).length;
     }), 1, 'the running game shows once in its own table');
@@ -302,7 +302,7 @@ function url(q) {
   console.log('game over on both, same score', hs);
   await peek.waitForFunction(function () {
     return !Array.from(document.querySelectorAll('#home-scores li.live')).some(function (li) { return li.textContent.indexOf('damla + astra') !== -1; });
-  }, null, { timeout: 25000 });
+  }, null, { timeout: 60000 });
   console.log('finished game left the live rows');
   await peekCtx.close();
   await host.waitForTimeout(300);

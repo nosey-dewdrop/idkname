@@ -9,7 +9,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const ORIGIN_OK = /^(https:\/\/idkname\.vercel\.app|https:\/\/idkname-[a-z0-9-]+\.vercel\.app|http:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?)$/;
 const HOST_GRACE_MS = 60000;
-const LIVE_MS = 15000;
+const LIVE_MS = 30000;
 const LIVE_MAX = 200;
 
 // *-*-*-*-*-*-*-*-*-*-*-* games running right now *-*-*-*-*-*-*-*-*-*-*-*

@@ -1057,13 +1057,18 @@
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* games running right now, on every screen *-*-*-*-*-*-*-*-*-*-*-*
-  // the host tells the relay its score every few seconds; everyone reads the list of running games.
+  // the host tells the relay its score every 10 seconds; everyone else reads the list every 20, and only while the page is in sight.
+  // every call counts against the relay's daily allowance, so an open tab must stay cheap.
+  let liveTick = 0;
   let liveGames = [];
   let liveSent = null;
   const liveId = Math.random().toString(36).slice(2, 12).padEnd(8, '0');
   function livePulse() {
     const running = role === 'host' && view && !view.over && view.score > 0;
     let opt = { cache: 'no-store' };
+    liveTick++;
+    if (running && liveTick % 2) { return; }
+    if (!running && !liveSent && liveTick % 4 !== 1) { return; }
     if (running) {
       liveSent = { id: liveId, who: view.players[0].name + ' + ' + view.players[1].name, score: view.score, rows: view.lines };
       opt = { method: 'POST', body: JSON.stringify(liveSent) };
@@ -2003,7 +2008,7 @@
     if (!document.hidden) { fetchScores(); }
   }, 20000);
   livePulse();
-  setInterval(livePulse, 4000);
+  setInterval(livePulse, 5000);
   show('home');
   dropLogoDot();
   requestAnimationFrame(frame);
