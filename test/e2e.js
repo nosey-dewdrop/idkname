@@ -347,7 +347,8 @@ function url(q) {
   await two.waitForSelector('#game:not([hidden])', { timeout: 20000 });
   await one.waitForFunction(function () { return window.__idkname.view().players[1].name === 'bora' && !window.__idkname.seeking(); }, null, { timeout: 20000 });
   assert.strictEqual(await two.evaluate(function () { return window.__idkname.role(); }), 'guest');
-  assert.strictEqual(await one.isVisible('#seek-note'), false);
+  assert.strictEqual((await one.textContent('#seek-note')).trim(), 'bora joined');
+  await one.waitForSelector('#seek-note', { state: 'hidden', timeout: 15000 });
   console.log('two people who came alone were put on one board, the second took the bot seat');
   // with a stranger nothing is heard or seen until you turn your own on.
   await one.waitForSelector('#mic:visible');

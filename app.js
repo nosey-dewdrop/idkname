@@ -36,7 +36,7 @@
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
       top: 'top scores', howTo: 'how to play', games: '{n} games played',
       find: 'play with someone', finding: 'looking for someone...', seekN: '{n} waiting',
-      seekNote: 'seat open for anyone', findAgain: 'find someone else',
+      seekNote: 'seat open for anyone', joined: '{name} joined', findAgain: 'find someone else',
       themMicAsk: '{name} wants to talk. turn your mic on to hear.', themCamAsk: '{name} turned the camera on. turn yours on to see each other.',
       together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice, camera', mic: 'mic', cam: 'cam', camNo: 'no camera permission', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
@@ -74,7 +74,7 @@
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
       top: 'en iyi skorlar', howTo: 'nasıl oynanır', games: '{n} oyun oynandı',
       find: 'biriyle oyna', finding: 'biri aranıyor...', seekN: '{n} bekliyor',
-      seekNote: 'yer herkese açık', findAgain: 'başka birini bul',
+      seekNote: 'yer herkese açık', joined: '{name} geldi', findAgain: 'başka birini bul',
       themMicAsk: '{name} konuşmak istiyor. duymak için mikrofonunu aç.', themCamAsk: '{name} kamerasını açtı. birbirinizi görmek için seninkini aç.',
       together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'ses, kamera', mic: 'ses', cam: 'kamera', camNo: 'kamera izni yok', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
@@ -278,6 +278,7 @@
   let matched = false;    // guest: this room came from the waiting line
   let matchTry = false;   // guest: still on the way into a matched room
   let seekCount = 0;
+  let joinedAt = -1e9;    // host: when a stranger last sat down, for a short note
   function stranger() { return seekMode || matched; }
   function seeking() { return seekMode && role === 'host' && botOn && !!view && !view.over; }
 
@@ -354,7 +355,10 @@
           awaySeat = false;
           botOn = false;
           SFX.join();
-          if (seekMode) { liveNow(); }
+          if (seekMode) {
+            joinedAt = performance.now();
+            liveNow();
+          }
           if (state) {
             state.players[1].name = names[1];
             paused = false;
@@ -1615,7 +1619,13 @@
       fitBoard();
     }
     placeSay(now);
-    if ($('seek-note').hidden === seeking()) { $('seek-note').hidden = !seeking(); }
+    // the open seat note; for a few seconds after a stranger sits down it says who came.
+    const came = seekMode && !botOn && now - joinedAt < 6000;
+    const note = seeking() ? t('seekNote') : came ? t('joined', { name: view.players[1].name }) : '';
+    if ($('seek-note').textContent !== note || $('seek-note').hidden === !!note) {
+      $('seek-note').textContent = note;
+      $('seek-note').hidden = !note;
+    }
     if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
