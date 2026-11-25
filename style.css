@@ -136,6 +136,10 @@ svg.pix { display: block; fill: currentColor; shape-rendering: crispEdges; }
 @keyframes liveblink { from { opacity: 1; } to { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .scores li.live span:last-child::before { animation: none; } }
 @keyframes bump { 0% { transform: translateY(10px); } 40% { transform: translateY(-4px); } 100% { transform: none; } }
+.tally { display: flex; justify-content: space-between; gap: 14px; }
+.btn .count { color: var(--mute); font-size: var(--t4); margin-left: 14px; }
+.btn .count:empty { display: none; }
+.seeknote { padding: 0 18px; margin: -6px 0 0; }
 .top { width: min(100%, 240px); padding: 0 18px; }
 .top .scores li { grid-template-columns: 2ch 5ch minmax(0, 1fr); gap: 8px; }
 .home-menu .status:empty { display: none; }
@@ -334,6 +338,7 @@ kbd.space { width: 66px; }
   #game.faces .card .next { grid-row: 2; grid-column: 2; }
   .you { display: none; }
   .botset { grid-area: set; justify-content: flex-end; padding: 0; margin: 0; }
+  .seeknote { grid-area: set; justify-self: start; align-self: end; padding: 0; margin: 0 0 8px; }
   .tool.help { margin-right: 0; }
   .helpbox { left: auto; right: 0; top: calc(100% + 8px); width: min(100%, 340px); }
   .frame { padding: 6px; }

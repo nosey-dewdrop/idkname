@@ -51,6 +51,7 @@
 
       <div class="menu" id="create-box">
         <button class="btn" id="create" data-i18n="create">play with a friend</button>
+        <button class="btn ghost" id="find"><span data-i18n="find">play with someone</span><span class="count" id="seek-count"></span></button>
         <button class="btn ghost" id="solo" data-i18n="solo">play with the computer</button>
         <div class="joinrow">
           <label class="field code-field">
@@ -69,7 +70,7 @@
       <p class="status" id="home-status" role="status"></p>
 
       <div id="home-best" hidden>
-        <p class="label" data-i18n="top">top scores</p>
+        <p class="label tally"><span data-i18n="top">top scores</span><span id="home-games"></span></p>
         <ol class="scores" id="home-scores"></ol>
       </div>
       <a class="quiet" id="guide-link" href="/guide/" data-i18n="howTo">how to play</a>
@@ -137,6 +138,7 @@
           <ol class="scores" id="ov-scores"></ol>
           <button class="btn" id="again" data-i18n="again">play again</button>
           <button class="btn" id="bot-take" data-i18n="botTake" hidden>keep going with the computer</button>
+          <button class="btn" id="find-again" data-i18n="findAgain" hidden>find someone else</button>
         </div>
       </div>
     </div>
@@ -148,6 +150,7 @@
         <video class="face" id="face-1" muted autoplay playsinline hidden></video>
         <p class="plines"><b class="pl">0</b> <span data-i18n="lines">rows</span></p>
       </aside>
+      <p class="hint seeknote" id="seek-note" data-i18n="seekNote" hidden>seat open for anyone</p>
       <div class="botset" id="bot-set" hidden>
         <button class="tool speed help" id="set-help" aria-expanded="false" aria-controls="help-box">?</button>
         <button class="tool speed" id="diff">difficulty: normal</button>

@@ -324,6 +324,53 @@ function url(q) {
   await host.waitForFunction(function () { return !window.__idkname.paused(); }, null, { timeout: 5000 });
   console.log('guest came back, game resumed');
 
+  // *-*-*-*-*-*-*-*-*-*-*-* two people who came alone *-*-*-*-*-*-*-*-*-*-*-*
+  const aCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const bCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const one = await aCtx.newPage();
+  const two = await bCtx.newPage();
+  one.on('pageerror', function (e) { errors.push('one: ' + e.message); });
+  two.on('pageerror', function (e) { errors.push('two: ' + e.message); });
+  await one.goto(url());
+  await one.fill('#name', 'ada');
+  await one.click('#find');
+  await one.waitForSelector('#game:not([hidden])', { timeout: 20000 });
+  await one.waitForFunction(function () { return window.__idkname.seeking() && window.__idkname.view().players[1].name === 'bot'; });
+  assert.strictEqual(await one.isVisible('#seek-note'), true, 'the open seat note is missing');
+  await one.keyboard.press('Space');
+  await one.screenshot({ path: shots + '/9-alone-waiting.png' });
+  await two.goto(url());
+  await two.fill('#name', 'bora');
+  await two.waitForFunction(function () { return /1/.test(document.getElementById('seek-count').textContent); }, null, { timeout: 45000 });
+  await two.screenshot({ path: shots + '/9-home-count.png' });
+  await two.click('#find');
+  await two.waitForSelector('#game:not([hidden])', { timeout: 20000 });
+  await one.waitForFunction(function () { return window.__idkname.view().players[1].name === 'bora' && !window.__idkname.seeking(); }, null, { timeout: 20000 });
+  assert.strictEqual(await two.evaluate(function () { return window.__idkname.role(); }), 'guest');
+  assert.strictEqual(await one.isVisible('#seek-note'), false);
+  console.log('two people who came alone were put on one board, the second took the bot seat');
+  // with a stranger nothing is heard or seen until you turn your own on.
+  await one.waitForSelector('#mic:visible');
+  await one.click('#mic');
+  await two.waitForFunction(function () { const v = window.__idkname.voice(); return v.them && v.state === 'connected'; }, null, { timeout: 20000 });
+  assert.strictEqual(await two.evaluate(function () { return window.__idkname.voice().muted; }), true, 'a stranger was heard without asking');
+  assert(/ada/.test(await two.textContent('#mic-note')));
+  await two.click('#mic');
+  await two.waitForFunction(function () { const v = window.__idkname.voice(); return v.mic && !v.muted; });
+  await one.click('#cam');
+  await two.waitForFunction(function () { return window.__idkname.voice().themCam; }, null, { timeout: 20000 });
+  await two.waitForTimeout(1500);
+  assert.strictEqual(await two.isVisible('#face-0'), false, 'a stranger was seen without asking');
+  await two.click('#cam');
+  await two.waitForFunction(function () { return !document.getElementById('face-0').hidden && !document.getElementById('face-1').hidden; }, null, { timeout: 20000 });
+  await two.screenshot({ path: shots + '/9-matched.png' });
+  console.log('stranger voice and camera stay shut until both sides turn theirs on');
+  // the stranger leaves: the game goes on with the bot and the seat is open again.
+  await two.close();
+  await one.waitForFunction(function () { return window.__idkname.view().players[1].name === 'bot' && window.__idkname.seeking() && !window.__idkname.paused(); }, null, { timeout: 20000 });
+  console.log('stranger left, bot sat back down, seat open again');
+  await one.close();
+
   assert.deepStrictEqual(errors, []);
   await browser.close();
   console.log('e2e ok');

@@ -11,16 +11,22 @@ const ORIGIN_OK = /^(https:\/\/idkname\.vercel\.app|https:\/\/idkname-[a-z0-9-]+
 const HOST_GRACE_MS = 60000;
 const LIVE_MS = 30000;
 const LIVE_MAX = 200;
+const HOLD_MS = 15000;
 
 // *-*-*-*-*-*-*-*-*-*-*-* games running right now *-*-*-*-*-*-*-*-*-*-*-*
 // every host posts its score every few seconds; an entry that stops arriving drops out after LIVE_MS.
 //   POST /live { id, who, score, rows, over }  -> { live: [{ who, score, rows }] }
 //   GET  /live                                 -> { live: [...] }
+// people who came alone: a host playing with the computer adds seek (its room code) to its post and stays open for a partner.
+//   POST /live { id, match: true }             -> { code } the longest waiting open room, or null. that room is held for
+//                                                 HOLD_MS so a second caller is not sent to the same seat.
+// every answer carries seeking, how many rooms are open for a partner.
 // test=1 keeps automated browsers in their own list, away from real players.
 export class Lobby extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.games = new Map();
+    this.seek = new Map();
   }
 
   async fetch(request) {
@@ -30,16 +36,42 @@ export class Lobby extends DurableObject {
     for (const [k, g] of this.games) {
       if (now - g.seen > LIVE_MS) { this.games.delete(k); }
     }
+    for (const [k, q] of this.seek) {
+      if (now - q.seen > LIVE_MS) { this.seek.delete(k); }
+    }
+    let code;
     if (request.method === 'POST') {
       let b = null;
       try { b = JSON.parse(await request.text()); } catch (e) { b = null; }
       const id = b && typeof b.id === 'string' && /^[a-z0-9]{8,32}$/.test(b.id) ? b.id : '';
       if (!id) { return Response.json({ live: [] }, { status: 400 }); }
+      if (b.match) {
+        code = null;
+        for (const [k, q] of this.seek) {
+          if (k !== id && q.test === test && now - q.held > HOLD_MS) {
+            q.held = now;
+            code = q.code;
+            break;
+          }
+        }
+      } else if (typeof b.seek === 'string' && /^[A-Z]{4}$/.test(b.seek) && !b.over) {
+        const old = this.seek.get(id);
+        if (old) {
+          old.code = b.seek;
+          old.seen = now;
+        } else if (this.seek.size < LIVE_MAX) {
+          this.seek.set(id, { code: b.seek, test: test, seen: now, held: 0 });
+        }
+      } else {
+        this.seek.delete(id);
+      }
       const who = String(b.who || '').replace(/[^\p{L}\p{N} +_.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 30);
       const score = Math.floor(Number(b.score));
       const rows = Math.floor(Number(b.rows));
       const sane = score > 0 && score <= 5000000 && rows >= 0 && rows <= 5000 && who.length >= 3 && who.indexOf(' + ') > 0;
-      if (b.over || !sane) {
+      if (b.match) {
+        /* a question only, nothing to store */
+      } else if (b.over || !sane) {
         this.games.delete(id);
       } else if (this.games.has(id) || this.games.size < LIVE_MAX) {
         this.games.set(id, { who: who, score: score, rows: rows, test: test, seen: now });
@@ -50,7 +82,13 @@ export class Lobby extends DurableObject {
       if (g.test === test) { live.push({ who: g.who, score: g.score, rows: g.rows }); }
     }
     live.sort(function (a, b) { return b.score - a.score; });
-    return Response.json({ live: live.slice(0, 50) });
+    let seeking = 0;
+    for (const q of this.seek.values()) {
+      if (q.test === test) { seeking++; }
+    }
+    const out = { live: live.slice(0, 50), seeking: seeking };
+    if (code !== undefined) { out.code = code; }
+    return Response.json(out);
   }
 }
 

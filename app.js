@@ -34,7 +34,10 @@
       awayYou: 'are you there?', awayYouDetail: 'paused. press any key to keep playing.',
       awayOther: '{name} is away', awayOtherDetail: 'paused. the game goes on when they are back.',
       hostLeft: 'lost the host', hostLeftDetail: 'trying to get back in...',
-      top: 'top scores', howTo: 'how to play',
+      top: 'top scores', howTo: 'how to play', games: '{n} games played',
+      find: 'play with someone', finding: 'looking for someone...', seekN: '{n} waiting',
+      seekNote: 'seat open for anyone', findAgain: 'find someone else',
+      themMicAsk: '{name} wants to talk. turn your mic on to hear.', themCamAsk: '{name} turned the camera on. turn yours on to see each other.',
       together: 'together', kSwap: 'swap next', kChat: 'chat', kMic: 'voice, camera', mic: 'mic', cam: 'cam', camNo: 'no camera permission', themMic: '{name} is on voice', micNo: 'no mic permission', voiceFail: 'voice could not connect on this network', chatPh: 'say something', watching: '{n} watching', youWatch: 'you are watching this room. tap a face to cheer.',
       skillEasy: 'level: easy', skillNormal: 'level: normal', skillSharp: 'level: sharp',
       speedCalm: 'speed: calm', speedNormal: 'speed: normal', speedFast: 'speed: fast',
@@ -69,7 +72,10 @@
       awayYou: 'orada mısın?', awayYouDetail: 'duraklatıldı. devam etmek için bir tuşa bas.',
       awayOther: '{name} uzakta', awayOtherDetail: 'duraklatıldı. geri gelince oyun devam eder.',
       hostLeft: 'oda sahibiyle bağlantı koptu', hostLeftDetail: 'tekrar girmeye çalışılıyor...',
-      top: 'en iyi skorlar', howTo: 'nasıl oynanır',
+      top: 'en iyi skorlar', howTo: 'nasıl oynanır', games: '{n} oyun oynandı',
+      find: 'biriyle oyna', finding: 'biri aranıyor...', seekN: '{n} bekliyor',
+      seekNote: 'yer herkese açık', findAgain: 'başka birini bul',
+      themMicAsk: '{name} konuşmak istiyor. duymak için mikrofonunu aç.', themCamAsk: '{name} kamerasını açtı. birbirinizi görmek için seninkini aç.',
       together: 'birlikte', kSwap: 'sıradakini takas et', kChat: 'sohbet', kMic: 'ses, kamera', mic: 'ses', cam: 'kamera', camNo: 'kamera izni yok', themMic: '{name} sesli konuşuyor', micNo: 'mikrofon izni yok', voiceFail: 'bu ağda ses bağlanamadı', chatPh: 'bir şey yaz', watching: '{n} kişi izliyor', youWatch: 'bu odayı izliyorsun. tezahürat için bir yüze dokun.',
       skillEasy: 'seviye: kolay', skillNormal: 'seviye: normal', skillSharp: 'seviye: usta',
       speedCalm: 'hız: sakin', speedNormal: 'hız: normal', speedFast: 'hız: hızlı',
@@ -115,6 +121,7 @@
     $('diff').textContent = t(DIFF_WORD[gameDiff]);
     renderHelp();
     refreshOverlay();
+    renderScores();
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* pixel icons *-*-*-*-*-*-*-*-*-*-*-*
@@ -265,6 +272,14 @@
   let linkLost = false;
   let lastHeard = 0;
   const SILENCE_MS = 4500;
+  // *-*-*-*-*-*-*-*-*-*-*-* people who came alone *-*-*-*-*-*-*-*-*-*-*-*
+  // the first one opens a room and plays with the computer; the next one is sent to that room and takes the computer's seat.
+  let seekMode = false;   // host: this room is open for whoever comes next
+  let matched = false;    // guest: this room came from the waiting line
+  let matchTry = false;   // guest: still on the way into a matched room
+  let seekCount = 0;
+  function stranger() { return seekMode || matched; }
+  function seeking() { return seekMode && role === 'host' && botOn && !!view && !view.over; }
 
   function myName() {
     const v = $('name').value.trim().slice(0, 12);
@@ -292,7 +307,7 @@
   }
 
   // *-*-*-*-*-*-*-*-*-*-*-* host *-*-*-*-*-*-*-*-*-*-*-*
-  function hostOpen(tries) {
+  function hostOpen(tries, quick) {
     role = 'host';
     me = 0;
     code = randomCode();
@@ -302,13 +317,19 @@
     peer = Net.host(code);
     peer.on('open', function () {
       $('home-status').textContent = '';
+      if (quick) {
+        seekMode = true;
+        hostStart(true);
+        liveNow();
+        return;
+      }
       enterLobby();
     });
     peer.on('connection', hostAccept);
     peer.on('error', function (err) {
       if (err.type === 'unavailable-id' && tries < 5) {
         peer.destroy();
-        hostOpen(tries + 1);
+        hostOpen(tries + 1, quick);
         return;
       }
       if ($('home').hidden === false) { $('home-status').textContent = t('netDown'); }
@@ -333,6 +354,7 @@
           awaySeat = false;
           botOn = false;
           SFX.join();
+          if (seekMode) { liveNow(); }
           if (state) {
             state.players[1].name = names[1];
             paused = false;
@@ -422,6 +444,11 @@
     away = -1;
     names[1] = '';
     if (state && !state.over) { paused = true; }
+    // a room from the waiting line never stops for a stranger who left: the computer sits back down and the seat is open again.
+    if (seekMode && state && !state.over) {
+      botSit();
+      liveNow();
+    }
     renderLobby();
     refreshOverlay();
     try { c.close(); } catch (e) { /* already gone */ }
@@ -505,6 +532,37 @@
     }, 16);
   }
 
+  // host: the computer takes the second seat of the running game.
+  function botSit() {
+    botOn = true;
+    awaySeat = away === 1;
+    away = -1;
+    seen[0] = performance.now();
+    names[1] = BOT_NAME;
+    state.players[1].name = BOT_NAME;
+    paused = false;
+    refreshOverlay();
+    sendLobby();
+    sendState(true);
+  }
+
+  // came alone: ask the relay for an open room; if there is none, open one and start with the computer.
+  function findStart() {
+    store('idkname-name', $('name').value.trim());
+    $('home-status').textContent = t('finding');
+    fetch(Net.LIVE + (navigator.webdriver ? '?test=1' : ''), { method: 'POST', body: JSON.stringify({ id: liveId, match: true }) }).then(function (r) {
+      return r.ok ? r.json() : Promise.reject();
+    }).then(function (j) {
+      if (j.code) {
+        matched = true;
+        matchTry = true;
+        guestJoin(j.code);
+      } else {
+        hostOpen(0, true);
+      }
+    }).catch(function () { $('home-status').textContent = t('netDown'); });
+  }
+
   function soloStart() {
     role = 'host';
     me = 0;
@@ -534,6 +592,13 @@
         setTimeout(guestConnect, 1500);
         return;
       }
+      // the open room was gone by the time we got there: open our own instead.
+      if (matchTry) {
+        matchTry = false;
+        matched = false;
+        hostOpen(0, true);
+        return;
+      }
       $('home-status').textContent = t(err.type === 'peer-unavailable' ? 'noRoom' : err.type === 'full' ? 'full' : 'netDown');
     });
     c.on('open', function () {
@@ -545,7 +610,13 @@
     });
     c.on('data', function (m) {
       lastHeard = performance.now();
-      if (m.t === 'full') {
+      if (m.t === 'full' && matchTry) {
+        matchTry = false;
+        matched = false;
+        conn = null;
+        c.close();
+        hostOpen(0, true);
+      } else if (m.t === 'full') {
         $('home-status').textContent = t('full');
         show('home');
       } else if (m.t === 'react') {
@@ -555,6 +626,16 @@
       } else if (m.t === 'rtc') {
         voiceSignal(m);
       } else if (m.t === 'lobby') {
+        // sent to a room whose seat was taken a moment ago: do not watch strangers, open our own room.
+        if (matchTry && m.as === 'watch') {
+          matchTry = false;
+          matched = false;
+          conn = null;
+          c.close();
+          hostOpen(0, true);
+          return;
+        }
+        matchTry = false;
         names = m.names;
         watchCount = m.w || 0;
         role = m.as === 'watch' ? 'watch' : 'guest';
@@ -921,7 +1002,8 @@
     for (let i = 0; i < 2; i++) {
       const f = $('face-' + i);
       const own = i === me;
-      const src = me < 0 ? null : own ? (camOn && camTrack ? camTrack : null) : (themCam && themFace ? themFace.getVideoTracks()[0] : null);
+      // with someone from the waiting line a face or a voice only comes through once you have turned your own on.
+      const src = me < 0 ? null : own ? (camOn && camTrack ? camTrack : null) : (themCam && themFace && (camOn || !stranger()) ? themFace.getVideoTracks()[0] : null);
       if (f._track !== src) {
         f._track = src;
         f.srcObject = src ? new MediaStream([src]) : null;
@@ -936,7 +1018,11 @@
       fitBoard();
     }
     const other = view && me >= 0 ? view.players[1 - me].name : '';
-    $('mic-note').textContent = voiceNote ? t(voiceNote) : themMic ? t('themMic', { name: other }) : '';
+    const shut = stranger() && !micOn;
+    $('voice').muted = shut;
+    $('mic-note').textContent = voiceNote ? t(voiceNote)
+      : themMic ? t(shut ? 'themMicAsk' : 'themMic', { name: other })
+        : themCam && stranger() && !camOn ? t('themCamAsk', { name: other }) : '';
   }
 
   // keeps each bubble by its speaker's piece while it falls: over the piece, tail on the face block.
@@ -1019,6 +1105,7 @@
   let lastRun = null;
   let globalTop = null;   // null until the shared table answers; then the list falls back to this device
   let liveRank = 0;
+  let gamesPlayed = 0;
 
   function loadLocal() {
     try {
@@ -1034,6 +1121,7 @@
     }).then(function (j) {
       if (Array.isArray(j.top)) {
         globalTop = j.top;
+        gamesPlayed = j.games | 0;
         renderScores();
       }
     }).catch(function () { /* no shared table here (local run or offline): keep the device list */ });
@@ -1063,14 +1151,19 @@
   let liveGames = [];
   let liveSent = null;
   const liveId = Math.random().toString(36).slice(2, 12).padEnd(8, '0');
+  function liveNow() {
+    liveTick = 1;
+    livePulse();
+  }
   function livePulse() {
-    const running = role === 'host' && view && !view.over && view.score > 0;
+    const running = role === 'host' && view && !view.over && (view.score > 0 || seeking());
     let opt = { cache: 'no-store' };
     liveTick++;
     if (running && liveTick % 2) { return; }
     if (!running && !liveSent && liveTick % 4 !== 1) { return; }
     if (running) {
       liveSent = { id: liveId, who: view.players[0].name + ' + ' + view.players[1].name, score: view.score, rows: view.lines };
+      if (seeking()) { liveSent.seek = code; }
       opt = { method: 'POST', body: JSON.stringify(liveSent) };
     } else if (liveSent) {
       liveSent.over = true;
@@ -1084,6 +1177,7 @@
     }).then(function (j) {
       if (Array.isArray(j.live)) {
         liveGames = j.live;
+        seekCount = j.seeking | 0;
         renderScores();
       }
     }).catch(function () { /* relay unreachable: the table shows finished games only */ });
@@ -1143,6 +1237,8 @@
   function renderScores() {
     const home = tableRows(false);
     $('home-best').hidden = home.length === 0;
+    $('home-games').textContent = gamesPlayed ? t('games', { n: gamesPlayed }) : '';
+    $('seek-count').textContent = seekCount ? t('seekN', { n: seekCount }) : '';
     fillScores($('home-scores'), home);
     fillScores($('ov-scores'), home);
     const side = tableRows(true);
@@ -1167,6 +1263,7 @@
       return;
     }
     $('bot-take').hidden = true;
+    $('find-again').hidden = true;
     $('ov-scores').hidden = !view.over;
     if (view.over) {
       ov.hidden = false;
@@ -1199,6 +1296,7 @@
       $('ov-score').hidden = true;
       $('ov-detail').textContent = t('hostLeftDetail');
       $('again').hidden = true;
+      $('find-again').hidden = !matched;
     } else {
       ov.hidden = true;
     }
@@ -1517,6 +1615,7 @@
       fitBoard();
     }
     placeSay(now);
+    if ($('seek-note').hidden === seeking()) { $('seek-note').hidden = !seeking(); }
     if (skyTick % 12 === 0) { renderScores(); }
     $('hud-score').textContent = view.score;
     $('hud-level').textContent = view.level;
@@ -1853,17 +1952,12 @@
   $('start').addEventListener('click', function () { hostStart(false); });
   $('start-bot').addEventListener('click', function () { hostStart(true); });
   $('again').addEventListener('click', function () { hostStart(botOn); });
-  $('bot-take').addEventListener('click', function () {
-    botOn = true;
-    awaySeat = away === 1;
-    away = -1;
-    seen[0] = performance.now();
-    names[1] = BOT_NAME;
-    state.players[1].name = BOT_NAME;
-    paused = false;
-    refreshOverlay();
-    sendLobby();
-    sendState(true);
+  $('bot-take').addEventListener('click', botSit);
+  $('find').addEventListener('click', findStart);
+  // a matched guest whose host is gone goes back to the waiting line with a fresh page.
+  $('find-again').addEventListener('click', function () {
+    try { sessionStorage.setItem('idkname-find', '1'); } catch (e) { /* lands on the home screen instead */ }
+    location.replace(location.pathname + location.search.replace(/[?&]room=[A-Za-z]{4}/, ''));
   });
   $('cam').addEventListener('click', function () {
     camToggle();
@@ -2013,5 +2107,11 @@
   dropLogoDot();
   requestAnimationFrame(frame);
   // read-only peek for the browser test.
-  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; }, voice: function () { return { mic: micOn, them: themMic, cam: camOn, themCam: themCam, state: pc ? pc.connectionState : 'none', pc: pc }; } };
+  try {
+    if (sessionStorage.getItem('idkname-find')) {
+      sessionStorage.removeItem('idkname-find');
+      findStart();
+    }
+  } catch (e) { /* no session storage: stay on the home screen */ }
+  window.__idkname = { view: function () { return view; }, paused: function () { return paused; }, role: function () { return role; }, away: function () { return away; }, setAway: function (ms) { AWAY_MS = ms; }, heard: function () { return heardN; }, seeking: seeking, stranger: stranger, voice: function () { return { muted: $('voice').muted, mic: micOn, them: themMic, cam: camOn, themCam: themCam, state: pc ? pc.connectionState : 'none', pc: pc }; } };
 })();
