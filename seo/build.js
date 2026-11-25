@@ -280,6 +280,23 @@ const RULES = [
     }
   },
   {
+    slug: 'someone', bag: 1,
+    en: {
+      t: 'play with someone when you come alone', d: 'No friend online? In idkname one button puts you on a board with whoever comes next. Until then the bot keeps you company.',
+      h: 'playing with someone you do not know',
+      p: ['press play with someone on the first screen. if another player is waiting, you land on their board and take the second colour.',
+        'if nobody is waiting, your game starts with the bot at once and your seat stays open. the next person who presses the button takes the bot\'s place in the middle of the game.',
+        'if that person leaves, the bot sits back down and the seat opens again. chat works from the first second. a voice or a face only comes through once you have turned your own mic or camera on.']
+    },
+    tr: {
+      t: 'yalnız geldiysen biriyle oyna', d: 'Çevrimiçi arkadaşın yok mu? idkname oyununda tek düğme seni sıradaki kişiyle aynı tahtaya koyar. O gelene kadar bot seninle oynar.',
+      h: 'tanımadığın biriyle oynamak',
+      p: ['ilk ekranda biriyle oyna düğmesine bas. bekleyen bir oyuncu varsa onun tahtasına düşer, ikinci rengi alırsın.',
+        'bekleyen yoksa oyunun botla hemen başlar ve yerin açık kalır. düğmeye basan sıradaki kişi oyunun ortasında botun yerine oturur.',
+        'o kişi çıkarsa bot geri oturur ve yer yeniden açılır. sohbet ilk saniyeden çalışır. ses ya da yüz, sen kendi mikrofonunu ya da kameranı açmadan gelmez.']
+    }
+  },
+  {
     slug: 'voice', bag: 1,
     en: {
       t: 'talk with your friend while you play', d: 'Voice chat in idkname. One button or the m key turns your microphone on and your friend hears you inside the game, no other app needed.',
