@@ -1,5 +1,5 @@
 // *-*-*-*-*-*-*-*-*-*-*-* shared score table *-*-*-*-*-*-*-*-*-*-*-*
-// GET  /api/scores -> { top: [{ score, rows, together, who, at }] }, the best game of each pair
+// GET  /api/scores -> { top: [{ score, rows, together, who, at }], games }, the best game of each pair and how many games were finished
 // POST /api/scores { score, rows, together, who } -> { ok: true }
 // every finished game is one tiny file whose name carries the whole record, so nothing is ever read-modify-written.
 
@@ -8,6 +8,8 @@ const { list, put } = require('@vercel/blob');
 const PREFIX = 'scores/';
 const MAX_SCORE = 5000000;
 const TOP = 100;
+const KEEP_MS = 10000;
+let kept = null;
 
 function clean(who) {
   return String(who || '').replace(/[^\p{L}\p{N} +_.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 30);
@@ -35,7 +37,21 @@ function fromName(pathname) {
 module.exports = async function (req, res) {
   try {
     if (req.method === 'GET') {
+      // the answer is kept for a few seconds: every open game asks, and each listing of the store is counted against the plan.
+      if (kept && Date.now() - kept.at < KEEP_MS) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(200).json(kept.body);
+        return;
+      }
+      // names sort by score, so the first page holds the best games; later pages are only counted.
       const out = await list({ prefix: PREFIX, limit: 1000 });
+      let games = out.blobs.length;
+      let cursor = out.cursor;
+      for (let i = 0; cursor && i < 50; i++) {
+        const more = await list({ prefix: PREFIX, limit: 1000, cursor: cursor });
+        games += more.blobs.length;
+        cursor = more.cursor;
+      }
       // one line per pair, their best game, so one busy pair cannot fill the whole table.
       const seen = {};
       const top = out.blobs.map(function (b) { return fromName(b.pathname); })
@@ -49,7 +65,8 @@ module.exports = async function (req, res) {
         })
         .slice(0, TOP);
       res.setHeader('Cache-Control', 'no-store');
-      res.status(200).json({ top: top });
+      kept = { at: Date.now(), body: { top: top, games: games } };
+      res.status(200).json(kept.body);
       return;
     }
     if (req.method === 'POST') {
@@ -68,6 +85,7 @@ module.exports = async function (req, res) {
         return;
       }
       await put(toName(rec), '1', { access: 'private', addRandomSuffix: false, contentType: 'text/plain' });
+      kept = null;
       res.status(200).json({ ok: true });
       return;
     }
