@@ -269,10 +269,24 @@ function url(q) {
   await watcher.waitForSelector('#game:not([hidden])', { timeout: 30000 });
   assert.strictEqual(await watcher.evaluate(function () { return window.__idkname.role(); }), 'watch');
   await host.waitForFunction(function () { return document.getElementById('watching').textContent.indexOf('1') !== -1; }, null, { timeout: 5000 });
-  const wx = await host.evaluate(function () { return window.__idkname.view().players[1].piece.x; });
-  await watcher.keyboard.press('ArrowLeft');
-  await watcher.waitForTimeout(400);
-  assert.strictEqual(await host.evaluate(function () { return window.__idkname.view().players[1].piece.x; }), wx, 'a watcher must not move pieces');
+  // the guest's piece keeps falling while we look: if it landed in between, a new piece stands at the start column and
+  // the two readings are of different pieces. only a pair of readings of the same piece says anything about the watcher.
+  const guestPiece = function () {
+    const q = window.__idkname.view().players[1];
+    return q.piece ? { x: q.piece.x, locks: q.locks } : null;
+  };
+  let samePiece = false;
+  for (let i = 0; i < 8 && !samePiece; i++) {
+    const w0 = await host.evaluate(guestPiece);
+    await watcher.keyboard.press('ArrowLeft');
+    await watcher.waitForTimeout(400);
+    const w1 = await host.evaluate(guestPiece);
+    if (w0 && w1 && w0.locks === w1.locks) {
+      assert.strictEqual(w1.x, w0.x, 'a watcher must not move pieces');
+      samePiece = true;
+    }
+  }
+  assert(samePiece, 'never saw the same guest piece twice');
   await watcher.tap('#reacts [data-react="0"]');
   await host.waitForSelector('.emote', { timeout: 5000 });
   await guest.waitForSelector('.emote', { timeout: 5000 });
