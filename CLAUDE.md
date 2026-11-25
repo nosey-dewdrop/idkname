@@ -25,6 +25,7 @@ HEDEF (Damla, 22 Kas 2026): "iki kişi beraber oynuyor, QR okutur odaya dahil ol
 - Font siteden gelir (24 Kas 2026): Jersey 15 `vendor/` altında, lisansı yanında. Google Fonts'a ulaşılamayan ağda sayfa açılmadan bekliyordu; dışarıdan yüklenen hiçbir dosya kalmadı.
 - Çalıştır: `python3 -m http.server <boş port> --bind 0.0.0.0`, telefon için ağ adresinden aç.
 - Test: `node test/engine.test.js`, `CHROME=<chromium> NODE_PATH=<playwright-core>/node_modules node test/e2e.js <url> <görüntü klasörü>`.
+- Sıra kontrolü: `test/queue.js` masaüstü chromium ile iPhone profilli Safari motorunu sıradan eşleştirir, telefon hamlesini, oda sahibi çıkınca `find someone else` yolunu ölçer (25 Kas 2026 canlıda geçti). Gerçek cihaz ve ayrı ağ bununla ölçülmez.
 - Telefon kontrolü: `test/phone.js` canlı QR'ı piksellerinden çözer, iPhone profiliyle Safari motorunda (playwright webkit) odaya girip dokunmatik oynar. Gerçek cihaz ve mobil veri ağı bununla ölçülmez.
 - YAYINDA (23 Kas 2026, Damla "deploy et"): https://idkname.vercel.app , `vercel deploy --prod --yes`. Repo github.com/nosey-dewdrop/idkname (private). `.rabadon/` repoya ve yayına girmez.
 - Ad Damla'nın: idkname (22 Kas 2026). "tetris" kelimesi ada girmez, başkasının markası.
